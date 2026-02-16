@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from 'next/navigation';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -61,6 +61,12 @@ async function apiFetch(path, opts = {}) {
 // ═══════════════════════════════════════════════════════════════════
 // SHARED COMPONENTS
 // ═══════════════════════════════════════════════════════════════════
+const RefreshIcon = ({ spinning }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: spinning ? "spin .8s linear infinite" : "none" }}>
+    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+  </svg>
+);
+
 const Badge = ({ status }) => { const s = STATUS[status] || STATUS.new; return (<span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 99, fontSize: 10.5, fontWeight: 700, background: s.bg, color: s.fg, letterSpacing: ".04em", textTransform: "uppercase" }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: s.fg }} />{s.label}</span>); };
 
 const Spin = ({ sz = 18 }) => (<svg width={sz} height={sz} viewBox="0 0 24 24" style={{ animation: "spin .8s linear infinite" }}><circle cx="12" cy="12" r="10" stroke={C.border} strokeWidth="2.5" fill="none" /><path d="M12 2a10 10 0 0 1 10 10" stroke={C.mint} strokeWidth="2.5" fill="none" strokeLinecap="round" /></svg>);
@@ -95,9 +101,13 @@ function OverviewPage() {
   const [daily, setDaily] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const intervalRef = useRef(null);
 
-  useEffect(() => {
-    setLoading(true);
+  const loadData = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     Promise.all([
       apiFetch("/analytics/summary").catch(() => null),
       apiFetch("/analytics/daily?days=30").catch(() => null),
@@ -105,8 +115,17 @@ function OverviewPage() {
       setSummary(s?.stats || null);
       setDaily(d?.analytics || []);
       setErr(!s && !d ? "Cannot reach backend — check Railway deployment" : null);
-    }).finally(() => setLoading(false));
+      setLastRefresh(new Date());
+    }).finally(() => { setLoading(false); setRefreshing(false); });
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    intervalRef.current = setInterval(() => loadData(true), 30000);
+    return () => clearInterval(intervalRef.current);
+  }, [loadData]);
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 100 }}><Spin sz={30} /></div>;
   if (err) return <Empty icon="⚠️" title="Connection Error" sub={err} />;
@@ -121,6 +140,13 @@ function OverviewPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+        {lastRefresh && <span style={{ fontSize: 10, color: C.textGhost }}>Updated {lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
+        <Btn sz="sm" onClick={() => loadData(true)} disabled={refreshing} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <RefreshIcon spinning={refreshing} />
+          Refresh
+        </Btn>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
         <Stat label="Total Leads" value={fm.num(s.totalLeads)} sub={`${fm.num(s.leadsToday)} today`} color={C.sky} icon="📋" />
         <Stat label="Sold" value={fm.num(s.soldLeads)} sub={`${fm.pct(conv)} conversion`} color={C.mint} icon="✓" />
@@ -188,16 +214,26 @@ function LeadsPage() {
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const intervalRef = useRef(null);
 
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     const p = new URLSearchParams({ page: filters.page, limit: 30 });
     if (filters.status) p.set("status", filters.status);
     if (filters.source) p.set("source", filters.source);
-    apiFetch(`/leads?${p}`).then(d => { setLeads(d.leads || []); setPg(d.pagination || { page: 1, totalPages: 1, totalCount: 0 }); }).catch(() => setLeads([])).finally(() => setLoading(false));
+    apiFetch(`/leads?${p}`).then(d => { setLeads(d.leads || []); setPg(d.pagination || { page: 1, totalPages: 1, totalCount: 0 }); setLastRefresh(new Date()); }).catch(() => setLeads([])).finally(() => { setLoading(false); setRefreshing(false); });
   }, [filters]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    intervalRef.current = setInterval(() => load(true), 30000);
+    return () => clearInterval(intervalRef.current);
+  }, [load]);
 
   const openDetail = l => { setSelected(l); setDetailLoading(true); apiFetch(`/leads/${l.id}`).then(d => setDetail(d)).catch(() => setDetail(null)).finally(() => setDetailLoading(false)); };
 
@@ -214,9 +250,16 @@ function LeadsPage() {
       <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
         <Sel label="Status" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value, page: 1 }))} options={[{ v: "", l: "All" }, { v: "new", l: "New" }, { v: "pending", l: "Pending" }, { v: "distributed", l: "Distributed" }, { v: "redirected", l: "Redirected" }, { v: "accepted", l: "Accepted" }, { v: "sold", l: "Sold" }, { v: "completed", l: "Completed" }, { v: "rejected", l: "Rejected" }, { v: "rejected_by_lender", l: "Rejected by Lender" }]} />
         <Inp label="Source" placeholder="e.g. teprestamos.es" value={filters.source} onChange={e => setFilters(f => ({ ...f, source: e.target.value, page: 1 }))} onKeyDown={e => e.key === "Enter" && load()} style={{ width: 180 }} />
-        <Btn v="primary" sz="sm" onClick={load}>Search</Btn>
+        <Btn v="primary" sz="sm" onClick={() => load()}>Search</Btn>
         <Btn sz="sm" onClick={exportCSV}>↓ CSV</Btn>
-        <div style={{ marginLeft: "auto", fontSize: 11.5, color: C.textDim, paddingBottom: 6 }}>{fm.num(pg.totalCount)} leads</div>
+        <Btn sz="sm" onClick={() => load(true)} disabled={refreshing} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <RefreshIcon spinning={refreshing} />
+          Refresh
+        </Btn>
+        <div style={{ marginLeft: "auto", fontSize: 11.5, color: C.textDim, paddingBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+          {lastRefresh && <span style={{ fontSize: 10, color: C.textGhost }}>Updated {lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
+          <span>{fm.num(pg.totalCount)} leads</span>
+        </div>
       </div>
       <Crd>
         <div style={{ overflowX: "auto" }}>
