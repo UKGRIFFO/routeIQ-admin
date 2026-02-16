@@ -1,26 +1,21 @@
 'use client';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
 export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
-
       if (res.ok) {
         router.push('/');
         router.refresh();
@@ -32,7 +27,6 @@ export default function LoginPage() {
     }
     setLoading(false);
   };
-
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -46,18 +40,12 @@ export default function LoginPage() {
       }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 11,
-            background: 'linear-gradient(135deg, #34D399, #38BDF8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 900, fontSize: 16, color: '#06090D',
-          }}>TP</div>
+          <img src="/RouteIQ_Icon.svg" alt="RouteIQ" style={{ width: 40, height: 40 }} />
           <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#E2E8F0' }}>TePrestamos</div>
-            <div style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>Admin Dashboard</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#E2E8F0' }}>RouteIQ</div>
+            <div style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>Lead Management</div>
           </div>
         </div>
-
         <form onSubmit={handleSubmit}>
           <label style={{
             display: 'block', fontSize: 11, fontWeight: 700, color: '#475569',
@@ -78,7 +66,6 @@ export default function LoginPage() {
               marginBottom: 16,
             }}
           />
-
           {error && (
             <div style={{
               padding: '10px 14px', borderRadius: 8, marginBottom: 16,
@@ -88,7 +75,6 @@ export default function LoginPage() {
               {error}
             </div>
           )}
-
           <button
             type="submit"
             disabled={loading || !password}
@@ -103,7 +89,6 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
-
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: '#334155' }}>
           Secured admin access
         </div>
