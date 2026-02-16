@@ -477,7 +477,7 @@ export default function DashboardPage() {
       <aside style={{ width: 220, background: C.panel, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ padding: "22px 20px 18px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="/RouteIQ_Icon.svg" alt="RouteIQ" style={{ width: 32, height: 32, marginRight: -4 }} />
+            <img src="/RouteIQ_Icon.svg" alt="RouteIQ" style={{ width: 32, height: 32, marginRight: -8 }} />
             <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>RouteIQ</div><div style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>Lead Management</div>
           </div>
         </div>
