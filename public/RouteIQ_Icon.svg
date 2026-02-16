@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 260" role="img" aria-label="RouteIQ icon">
+  <defs>
+    <style>
+      .primary { fill:#FFFFFF; }
+      .accent { fill:#00C853; }
+    </style>
+  </defs>
+  <g transform="translate(30,30)">
+    <circle cx="100" cy="100" r="90" class="primary"/>
+    <circle cx="100" cy="100" r="55" fill="#111821"/>
+    <path d="M100 100 L175 175 L140 200 L85 145 Z" class="accent"/>
+  </g>
+</svg>
