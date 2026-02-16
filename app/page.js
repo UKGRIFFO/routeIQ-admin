@@ -438,7 +438,7 @@ function SettingsPage() {
       <Crd style={{ padding: "22px 24px" }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 10 }}>Platform</div>
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", fontSize: 12.5 }}>
-          <span style={{ color: C.textDim, fontWeight: 600 }}>Website</span><span style={{ color: C.sky }}>teprestamos.es</span>
+          <span style={{ color: C.textDim, fontWeight: 600 }}>Website</span><span style={{ color: C.sky }}>teprestamoshoy.es</span>
           <span style={{ color: C.textDim, fontWeight: 600 }}>Backend</span><span style={{ color: C.sky }}>Railway (Node.js + PostgreSQL)</span>
           <span style={{ color: C.textDim, fontWeight: 600 }}>Dashboard</span><span style={{ color: C.sky }}>Next.js on Vercel</span>
         </div>
@@ -477,8 +477,8 @@ export default function DashboardPage() {
       <aside style={{ width: 220, background: C.panel, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ padding: "22px 20px 18px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: `linear-gradient(135deg, ${C.mint}, ${C.sky})`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, color: C.bg }}>TP</div>
-            <div><div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>TePrestamos</div><div style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>Admin Panel</div></div>
+            <img src="/RouteIQ_Icon.svg" alt="RouteIQ" style={{ width: 32, height: 32 }} />
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>RouteIQ</div><div style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>Lead Management</div>
           </div>
         </div>
         <nav style={{ padding: "14px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
