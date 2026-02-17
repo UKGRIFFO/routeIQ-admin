@@ -262,13 +262,14 @@ function LeadsPage() {
       <Crd>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{["ID", "Name", "Email", "Phone", "Amount", "Purpose", "Status", "Commission", "Response", "Source", "Created"].map(h => (<th key={h} style={{ padding: "11px 14px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
+            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{["ID", "Created", "Name", "Email", "Phone", "Amount", "Purpose", "Status", "Commission", "Response", "Source"].map(h => (<th key={h} style={{ padding: "11px 14px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
             <tbody>
               {loading ? <tr><td colSpan={11} style={{ textAlign: "center", padding: 48 }}><Spin /></td></tr> :
                leads.length === 0 ? <tr><td colSpan={11}><Empty icon="📭" title="No leads found" sub="Adjust filters or wait for new leads" /></td></tr> :
                leads.map(l => (
                 <tr key={l.id} onClick={() => openDetail(l)} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer", transition: "background .1s" }} onMouseEnter={e => e.currentTarget.style.background = C.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>#{l.id}</td>
+                  <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11, whiteSpace: "nowrap" }}>{fm.dt(l.created_at)}</td>
                   <td style={{ padding: "9px 14px", fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>{l.first_name} {l.last_name}</td>
                   <td style={{ padding: "9px 14px", color: C.textSoft, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>{l.email}</td>
                   <td style={{ padding: "9px 14px", color: C.textSoft, fontVariantNumeric: "tabular-nums" }}>{l.phone}</td>
@@ -278,7 +279,6 @@ function LeadsPage() {
                   <td style={{ padding: "9px 14px", fontWeight: 800, color: parseFloat(l.revenue) > 0 ? C.mint : C.textGhost, fontVariantNumeric: "tabular-nums" }}>{parseFloat(l.revenue) > 0 ? fm.eur(l.revenue) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: l.response_time_ms ? C.cyan : C.textGhost, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontSize: 11.5 }}>{l.response_time_ms ? fm.ms(l.response_time_ms) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11 }}>{l.source}</td>
-                  <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11, whiteSpace: "nowrap" }}>{fm.dt(l.created_at)}</td>
                 </tr>
               ))}
             </tbody>
