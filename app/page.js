@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from 'next/navigation';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -22,22 +22,15 @@ const C = {
   sky: "#38BDF8", skyDim: "rgba(56,189,248,.12)",
   violet: "#A78BFA", violetDim: "rgba(167,139,250,.12)",
   rose: "#FB7185", roseDim: "rgba(251,113,133,.12)",
-  orange: "#FB923C", orangeDim: "rgba(251,146,60,.12)",
-  cyan: "#22D3EE", cyanDim: "rgba(34,211,238,.12)",
 };
 
 const STATUS = {
-  new:                { bg: C.skyDim, fg: C.sky, label: "New" },
-  pending:            { bg: C.goldDim, fg: C.gold, label: "Pending" },
-  distributed:        { bg: C.violetDim, fg: C.violet, label: "Distributed" },
-  redirected:         { bg: C.cyanDim, fg: C.cyan, label: "Redirected" },
-  accepted:           { bg: C.mintDim, fg: C.mint, label: "Accepted" },
-  sold:               { bg: C.mintDim, fg: C.mint, label: "Sold" },
-  completed:          { bg: C.mintDim, fg: C.mint, label: "Completed" },
-  rejected:           { bg: C.redDim, fg: C.red, label: "Rejected" },
-  rejected_by_lender: { bg: C.redDim, fg: C.red, label: "Rejected by Lender" },
-  duplicate:          { bg: C.goldDim, fg: C.gold, label: "Duplicate" },
-  error:              { bg: C.roseDim, fg: C.rose, label: "Error" },
+  new:         { bg: C.skyDim, fg: C.sky, label: "New" },
+  distributed: { bg: C.violetDim, fg: C.violet, label: "Distributed" },
+  sold:        { bg: C.mintDim, fg: C.mint, label: "Sold" },
+  rejected:    { bg: C.redDim, fg: C.red, label: "Rejected" },
+  duplicate:   { bg: C.goldDim, fg: C.gold, label: "Duplicate" },
+  error:       { bg: C.roseDim, fg: C.rose, label: "Error" },
 };
 
 const fm = {
@@ -47,8 +40,7 @@ const fm = {
   date: d => d ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—",
   time: d => d ? new Date(d).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "",
   dt: d => d ? `${fm.date(d)} ${fm.time(d)}` : "—",
-  ms: v => v != null ? `${(Number(v) / 1000).toFixed(2)}s` : "—",
-  msRaw: v => v != null ? `${Number(v).toLocaleString()}ms` : "—",
+  ms: v => v != null ? `${(v / 1000).toFixed(1)}s` : "—",
   short: d => d ? new Date(d + "T00:00").toLocaleDateString("en", { day: "numeric", month: "short" }) : "",
 };
 
@@ -61,12 +53,6 @@ async function apiFetch(path, opts = {}) {
 // ═══════════════════════════════════════════════════════════════════
 // SHARED COMPONENTS
 // ═══════════════════════════════════════════════════════════════════
-const RefreshIcon = ({ spinning }) => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: spinning ? "spin .8s linear infinite" : "none" }}>
-    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-  </svg>
-);
-
 const Badge = ({ status }) => { const s = STATUS[status] || STATUS.new; return (<span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 99, fontSize: 10.5, fontWeight: 700, background: s.bg, color: s.fg, letterSpacing: ".04em", textTransform: "uppercase" }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: s.fg }} />{s.label}</span>); };
 
 const Spin = ({ sz = 18 }) => (<svg width={sz} height={sz} viewBox="0 0 24 24" style={{ animation: "spin .8s linear infinite" }}><circle cx="12" cy="12" r="10" stroke={C.border} strokeWidth="2.5" fill="none" /><path d="M12 2a10 10 0 0 1 10 10" stroke={C.mint} strokeWidth="2.5" fill="none" strokeLinecap="round" /></svg>);
@@ -101,13 +87,9 @@ function OverviewPage() {
   const [daily, setDaily] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
-  const [lastRefresh, setLastRefresh] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const intervalRef = useRef(null);
 
-  const loadData = useCallback((silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  useEffect(() => {
+    setLoading(true);
     Promise.all([
       apiFetch("/analytics/summary").catch(() => null),
       apiFetch("/analytics/daily?days=30").catch(() => null),
@@ -115,17 +97,8 @@ function OverviewPage() {
       setSummary(s?.stats || null);
       setDaily(d?.analytics || []);
       setErr(!s && !d ? "Cannot reach backend — check Railway deployment" : null);
-      setLastRefresh(new Date());
-    }).finally(() => { setLoading(false); setRefreshing(false); });
+    }).finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    intervalRef.current = setInterval(() => loadData(true), 30000);
-    return () => clearInterval(intervalRef.current);
-  }, [loadData]);
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 100 }}><Spin sz={30} /></div>;
   if (err) return <Empty icon="⚠️" title="Connection Error" sub={err} />;
@@ -140,19 +113,11 @@ function OverviewPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
-        {lastRefresh && <span style={{ fontSize: 10, color: C.textGhost }}>Updated {lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
-        <Btn sz="sm" onClick={() => loadData(true)} disabled={refreshing} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <RefreshIcon spinning={refreshing} />
-          Refresh
-        </Btn>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14 }}>
         <Stat label="Total Leads" value={fm.num(s.totalLeads)} sub={`${fm.num(s.leadsToday)} today`} color={C.sky} icon="📋" />
         <Stat label="Sold" value={fm.num(s.soldLeads)} sub={`${fm.pct(conv)} conversion`} color={C.mint} icon="✓" />
         <Stat label="Revenue" value={fm.eur(s.totalRevenue)} sub={`${fm.eur(avgRev)} per sale`} color={C.gold} icon="€" />
         <Stat label="This Week" value={fm.num(s.leadsThisWeek)} sub={`${fm.num(s.leadsThisMonth)} this month`} color={C.violet} icon="📈" />
-        <Stat label="Avg Response" value={s.avgResponseTimeMs ? fm.ms(s.avgResponseTimeMs) : "—"} sub={s.avgResponseTimeMs ? fm.msRaw(s.avgResponseTimeMs) : "No data yet"} color={C.cyan} icon="⚡" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <Crd style={{ padding: "18px 20px" }}>
@@ -193,8 +158,8 @@ function OverviewPage() {
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 14 }}>Daily Breakdown</div>
           <div style={{ overflowX: "auto", maxHeight: 220 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead><tr>{["Date", "Leads", "Sold", "Rejected", "Dupes", "Revenue", "Avg Time"].map(h => (<th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, background: C.card }}>{h}</th>))}</tr></thead>
-              <tbody>{[...daily].reverse().slice(0, 14).map((d, i) => (<tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}><td style={{ padding: "7px 12px", color: C.textSoft, whiteSpace: "nowrap" }}>{fm.short(d.date)}</td><td style={{ padding: "7px 12px", fontWeight: 700, color: C.text }}>{d.total_leads}</td><td style={{ padding: "7px 12px", color: C.mint, fontWeight: 700 }}>{d.sold_leads}</td><td style={{ padding: "7px 12px", color: C.red }}>{d.rejected_leads}</td><td style={{ padding: "7px 12px", color: C.gold }}>{d.duplicate_leads}</td><td style={{ padding: "7px 12px", color: C.gold, fontWeight: 700 }}>{fm.eur(d.total_revenue)}</td><td style={{ padding: "7px 12px", color: C.cyan, fontSize: 11 }}>{d.avg_response_time ? fm.ms(d.avg_response_time) : "—"}</td></tr>))}</tbody>
+              <thead><tr>{["Date", "Leads", "Sold", "Rejected", "Dupes", "Revenue"].map(h => (<th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, background: C.card }}>{h}</th>))}</tr></thead>
+              <tbody>{[...daily].reverse().slice(0, 14).map((d, i) => (<tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}><td style={{ padding: "7px 12px", color: C.textSoft, whiteSpace: "nowrap" }}>{fm.short(d.date)}</td><td style={{ padding: "7px 12px", fontWeight: 700, color: C.text }}>{d.total_leads}</td><td style={{ padding: "7px 12px", color: C.mint, fontWeight: 700 }}>{d.sold_leads}</td><td style={{ padding: "7px 12px", color: C.red }}>{d.rejected_leads}</td><td style={{ padding: "7px 12px", color: C.gold }}>{d.duplicate_leads}</td><td style={{ padding: "7px 12px", color: C.gold, fontWeight: 700 }}>{fm.eur(d.total_revenue)}</td></tr>))}</tbody>
             </table>
           </div>
         </Crd>
@@ -214,33 +179,23 @@ function LeadsPage() {
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const intervalRef = useRef(null);
 
-  const load = useCallback((silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  const load = useCallback(() => {
+    setLoading(true);
     const p = new URLSearchParams({ page: filters.page, limit: 30 });
     if (filters.status) p.set("status", filters.status);
     if (filters.source) p.set("source", filters.source);
-    apiFetch(`/leads?${p}`).then(d => { setLeads(d.leads || []); setPg(d.pagination || { page: 1, totalPages: 1, totalCount: 0 }); setLastRefresh(new Date()); }).catch(() => setLeads([])).finally(() => { setLoading(false); setRefreshing(false); });
+    apiFetch(`/leads?${p}`).then(d => { setLeads(d.leads || []); setPg(d.pagination || { page: 1, totalPages: 1, totalCount: 0 }); }).catch(() => setLeads([])).finally(() => setLoading(false));
   }, [filters]);
 
   useEffect(() => { load(); }, [load]);
-
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    intervalRef.current = setInterval(() => load(true), 30000);
-    return () => clearInterval(intervalRef.current);
-  }, [load]);
 
   const openDetail = l => { setSelected(l); setDetailLoading(true); apiFetch(`/leads/${l.id}`).then(d => setDetail(d)).catch(() => setDetail(null)).finally(() => setDetailLoading(false)); };
 
   const exportCSV = () => {
     if (!leads.length) return;
-    const hdr = ["ID", "First Name", "Last Name", "Email", "Phone", "Loan Amount", "Status", "Source", "Response Time (ms)", "Created"];
-    const rows = leads.map(l => [l.id, l.first_name, l.last_name, l.email, l.phone, l.loan_amount, l.status, l.source, l.response_time_ms || "", l.created_at]);
+    const hdr = ["ID", "First Name", "Last Name", "Email", "Phone", "Loan Amount", "Status", "Revenue", "Source", "Created"];
+    const rows = leads.map(l => [l.id, l.first_name, l.last_name, l.email, l.phone, l.loan_amount, l.status, l.revenue || 0, l.source, l.created_at]);
     const csv = [hdr, ...rows].map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   };
@@ -248,26 +203,19 @@ function LeadsPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <Sel label="Status" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value, page: 1 }))} options={[{ v: "", l: "All" }, { v: "new", l: "New" }, { v: "pending", l: "Pending" }, { v: "distributed", l: "Distributed" }, { v: "redirected", l: "Redirected" }, { v: "accepted", l: "Accepted" }, { v: "sold", l: "Sold" }, { v: "completed", l: "Completed" }, { v: "rejected", l: "Rejected" }, { v: "rejected_by_lender", l: "Rejected by Lender" }]} />
+        <Sel label="Status" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value, page: 1 }))} options={[{ v: "", l: "All" }, { v: "new", l: "New" }, { v: "distributed", l: "Distributed" }, { v: "sold", l: "Sold" }, { v: "rejected", l: "Rejected" }]} />
         <Inp label="Source" placeholder="e.g. teprestamos.es" value={filters.source} onChange={e => setFilters(f => ({ ...f, source: e.target.value, page: 1 }))} onKeyDown={e => e.key === "Enter" && load()} style={{ width: 180 }} />
-        <Btn v="primary" sz="sm" onClick={() => load()}>Search</Btn>
+        <Btn v="primary" sz="sm" onClick={load}>Search</Btn>
         <Btn sz="sm" onClick={exportCSV}>↓ CSV</Btn>
-        <Btn sz="sm" onClick={() => load(true)} disabled={refreshing} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <RefreshIcon spinning={refreshing} />
-          Refresh
-        </Btn>
-        <div style={{ marginLeft: "auto", fontSize: 11.5, color: C.textDim, paddingBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
-          {lastRefresh && <span style={{ fontSize: 10, color: C.textGhost }}>Updated {lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
-          <span>{fm.num(pg.totalCount)} leads</span>
-        </div>
+        <div style={{ marginLeft: "auto", fontSize: 11.5, color: C.textDim, paddingBottom: 6 }}>{fm.num(pg.totalCount)} leads</div>
       </div>
       <Crd>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{["ID", "Name", "Email", "Phone", "Amount", "Status", "Response", "Source", "Created"].map(h => (<th key={h} style={{ padding: "11px 14px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
+            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{["ID", "Name", "Email", "Phone", "Amount", "Purpose", "Status", "Commission", "Source", "Created"].map(h => (<th key={h} style={{ padding: "11px 14px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={9} style={{ textAlign: "center", padding: 48 }}><Spin /></td></tr> :
-               leads.length === 0 ? <tr><td colSpan={9}><Empty icon="📭" title="No leads found" sub="Adjust filters or wait for new leads" /></td></tr> :
+              {loading ? <tr><td colSpan={10} style={{ textAlign: "center", padding: 48 }}><Spin /></td></tr> :
+               leads.length === 0 ? <tr><td colSpan={10}><Empty icon="📭" title="No leads found" sub="Adjust filters or wait for new leads" /></td></tr> :
                leads.map(l => (
                 <tr key={l.id} onClick={() => openDetail(l)} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer", transition: "background .1s" }} onMouseEnter={e => e.currentTarget.style.background = C.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>#{l.id}</td>
@@ -275,8 +223,9 @@ function LeadsPage() {
                   <td style={{ padding: "9px 14px", color: C.textSoft, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>{l.email}</td>
                   <td style={{ padding: "9px 14px", color: C.textSoft, fontVariantNumeric: "tabular-nums" }}>{l.phone}</td>
                   <td style={{ padding: "9px 14px", fontWeight: 700, color: C.gold, fontVariantNumeric: "tabular-nums" }}>{fm.eur(l.loan_amount)}</td>
+                  <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11.5 }}>{l.loan_purpose || "—"}</td>
                   <td style={{ padding: "9px 14px" }}><Badge status={l.status} /></td>
-                  <td style={{ padding: "9px 14px", color: C.cyan, fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{l.response_time_ms ? fm.ms(l.response_time_ms) : "—"}</td>
+                  <td style={{ padding: "9px 14px", fontWeight: 800, color: parseFloat(l.revenue) > 0 ? C.mint : C.textGhost, fontVariantNumeric: "tabular-nums" }}>{parseFloat(l.revenue) > 0 ? fm.eur(l.revenue) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11 }}>{l.source}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11, whiteSpace: "nowrap" }}>{fm.dt(l.created_at)}</td>
                 </tr>
@@ -287,60 +236,14 @@ function LeadsPage() {
         {pg.totalPages > 1 && (<div style={{ display: "flex", justifyContent: "center", gap: 10, padding: 14, borderTop: `1px solid ${C.border}` }}><Btn sz="sm" v="ghost" disabled={filters.page <= 1} onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}>← Prev</Btn><span style={{ fontSize: 11.5, color: C.textDim, alignSelf: "center" }}>{pg.page} / {pg.totalPages}</span><Btn sz="sm" v="ghost" disabled={filters.page >= pg.totalPages} onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))}>Next →</Btn></div>)}
       </Crd>
 
-      <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); }} title={selected ? `Lead #${selected.id} — ${selected.first_name} ${selected.last_name}` : ""} w={700}>
+      <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); }} title={selected ? `Lead #${selected.id} — ${selected.first_name} ${selected.last_name}` : ""} w={660}>
         {detailLoading ? <div style={{ textAlign: "center", padding: 44 }}><Spin sz={26} /></div> : detail?.lead ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              {[
-                ["Email", detail.lead.email],
-                ["Phone", detail.lead.phone],
-                ["Loan Amount", fm.eur(detail.lead.loan_amount)],
-                ["Loan Purpose", detail.lead.loan_purpose],
-                ["Loan Period", detail.lead.loan_period ? `${detail.lead.loan_period} days` : null],
-                ["Status", null, <Badge key="b" status={detail.lead.status} />],
-                ["Source", detail.lead.source],
-                ["Country", detail.lead.country],
-                ["Created", fm.dt(detail.lead.created_at)],
-                ["IP", detail.lead.ip_address],
-              ].map(([k, v, node]) => (
+              {[["Email", detail.lead.email], ["Phone", detail.lead.phone], ["Loan Amount", fm.eur(detail.lead.loan_amount)], ["Loan Purpose", detail.lead.loan_purpose], ["Loan Period", detail.lead.loan_period ? `${detail.lead.loan_period} days` : null], ["Credit Score", detail.lead.credit_score], ["Employment", detail.lead.employment_status], ["Annual Income", fm.eur(detail.lead.annual_income)], ["Company", detail.lead.company_name], ["Housing", detail.lead.housing_status], ["Dependents", detail.lead.dependents], ["Country", detail.lead.country], ["Source", detail.lead.source], ["Status", null, <Badge key="b" status={detail.lead.status} />], ["Created", fm.dt(detail.lead.created_at)], ["IP", detail.lead.ip_address]].map(([k, v, node]) => (
                 <div key={k}><div style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>{k}</div>{node || <div style={{ fontSize: 13, color: v ? C.text : C.textDim }}>{v || "—"}</div>}</div>
               ))}
             </div>
-
-            {/* FiestaCredito Details */}
-            {(detail.lead.fiesta_lead_id || detail.lead.redirect_url || detail.lead.response_time_ms || detail.lead.rejection_reason) && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>FiestaCredito Details</div>
-                <div style={{ padding: "14px 16px", background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  {detail.lead.fiesta_lead_id && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Fiesta Lead ID</div><div style={{ fontSize: 12, color: C.text, marginTop: 2, fontFamily: "monospace" }}>{detail.lead.fiesta_lead_id}</div></div>)}
-                  {detail.lead.response_time_ms && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Response Time</div><div style={{ fontSize: 14, color: C.cyan, fontWeight: 800, marginTop: 2 }}>{fm.ms(detail.lead.response_time_ms)} <span style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>({fm.msRaw(detail.lead.response_time_ms)})</span></div></div>)}
-                  {detail.lead.distributed_at && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Distributed At</div><div style={{ fontSize: 12, color: C.text, marginTop: 2 }}>{fm.dt(detail.lead.distributed_at)}</div></div>)}
-                  {detail.lead.revenue > 0 && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Revenue</div><div style={{ fontSize: 14, color: C.gold, fontWeight: 800, marginTop: 2 }}>{fm.eur(detail.lead.revenue)}</div></div>)}
-                  {detail.lead.redirect_url && (<div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect URL</div><div style={{ fontSize: 11, color: C.sky, marginTop: 2, wordBreak: "break-all", fontFamily: "monospace" }}>{detail.lead.redirect_url}</div></div>)}
-                  {detail.lead.rejection_reason && (<div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Rejection Reason</div><div style={{ fontSize: 12, color: C.red, marginTop: 2 }}>{detail.lead.rejection_reason}</div></div>)}
-                </div>
-              </div>
-            )}
-
-            {/* Postback Events */}
-            {detail.postbacks?.length > 0 && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Postback Events</div>
-                {detail.postbacks.map((pb, i) => (
-                  <div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{pb.event}</div>
-                      <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{fm.dt(pb.created_at)} · Event ID: {pb.event_id || "—"}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      {pb.payout > 0 && <div style={{ fontSize: 14, fontWeight: 800, color: C.gold }}>{fm.eur(pb.payout)}</div>}
-                      <Badge status={pb.event === "lead_sold" ? "sold" : pb.event === "lead_accepted" ? "accepted" : pb.event === "lead_completed" ? "completed" : "redirected"} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
             {detail.distributions?.length > 0 && (<div><div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Distribution History</div>{detail.distributions.map((d, i) => (<div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}><div><div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{d.lender_name}</div><div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Sent {fm.dt(d.sent_at)} · {fm.ms(d.response_time_ms)} response</div></div><div style={{ textAlign: "right" }}><Badge status={d.was_purchased ? "sold" : d.response_status === "rejected" ? "rejected" : "distributed"} />{d.sale_price != null && <div style={{ fontSize: 12, fontWeight: 800, color: C.mint, marginTop: 4 }}>{fm.eur(d.sale_price)}</div>}</div></div>))}</div>)}
           </div>
         ) : <Empty icon="⚠️" title="Could not load lead details" />}
@@ -466,9 +369,8 @@ function AnalyticsPage() {
 
   useEffect(() => { setLoading(true); apiFetch(`/analytics/daily?days=${days}`).then(d => setDaily(d.analytics || [])).catch(() => setDaily([])).finally(() => setLoading(false)); }, [days]);
 
-  const t = daily.reduce((a, d) => ({ leads: a.leads + (d.total_leads || 0), sold: a.sold + (d.sold_leads || 0), rej: a.rej + (d.rejected_leads || 0), dupes: a.dupes + (d.duplicate_leads || 0), rev: a.rev + (Number(d.total_revenue) || 0), respTimes: d.avg_response_time ? [...a.respTimes, Number(d.avg_response_time)] : a.respTimes }), { leads: 0, sold: 0, rej: 0, dupes: 0, rev: 0, respTimes: [] });
+  const t = daily.reduce((a, d) => ({ leads: a.leads + (d.total_leads || 0), sold: a.sold + (d.sold_leads || 0), rej: a.rej + (d.rejected_leads || 0), dupes: a.dupes + (d.duplicate_leads || 0), rev: a.rev + (Number(d.total_revenue) || 0) }), { leads: 0, sold: 0, rej: 0, dupes: 0, rev: 0 });
   const conv = t.leads > 0 ? t.sold / t.leads : 0;
-  const avgResp = t.respTimes.length > 0 ? t.respTimes.reduce((a, b) => a + b, 0) / t.respTimes.length : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -477,14 +379,13 @@ function AnalyticsPage() {
         {[7, 14, 30, 60, 90].map(d => <Btn key={d} sz="sm" v={days === d ? "primary" : "ghost"} onClick={() => setDays(d)}>{d}d</Btn>)}
       </div>
       {loading ? <div style={{ textAlign: "center", padding: 80 }}><Spin sz={28} /></div> : (<>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 12 }}>
           <Stat label="Leads" value={fm.num(t.leads)} color={C.sky} />
           <Stat label="Avg/Day" value={daily.length > 0 ? (t.leads / daily.length).toFixed(1) : "0"} color={C.violet} />
           <Stat label="Sold" value={fm.num(t.sold)} color={C.mint} />
           <Stat label="Conv Rate" value={fm.pct(conv)} color={C.mint} />
           <Stat label="Revenue" value={fm.eur(t.rev)} color={C.gold} />
           <Stat label="Rejected" value={fm.num(t.rej)} color={C.red} />
-          <Stat label="Avg Response" value={avgResp ? fm.ms(avgResp) : "—"} color={C.cyan} />
         </div>
         <Crd style={{ padding: "18px 20px" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 14 }}>Trend — {days} Days</div>
@@ -531,19 +432,16 @@ function SettingsPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Btn sz="sm" v="primary" onClick={check} disabled={checking}>{checking ? <><Spin sz={12} /> Checking…</> : "Test Connection"}</Btn>{health && <span style={{ fontSize: 12, fontWeight: 700, color: health.ok ? C.mint : C.red }}>{health.ok ? "✓ Online" : `✕ ${health.msg}`}</span>}</div>
       </Crd>
       <Crd style={{ padding: "22px 24px" }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 10 }}>Webhook URLs</div>
-        <div style={{ fontSize: 12.5, color: C.textSoft, marginBottom: 10 }}>Send leads from your landing pages:</div>
-        <code style={{ display: "block", fontSize: 12, color: C.mint, background: C.panel, padding: "12px 14px", borderRadius: 8, border: `1px solid ${C.border}`, wordBreak: "break-all", marginBottom: 10 }}>POST {API}/leads/webhook</code>
-        <div style={{ fontSize: 12.5, color: C.textSoft, marginBottom: 10 }}>Submit directly to FiestaCredito:</div>
-        <code style={{ display: "block", fontSize: 12, color: C.cyan, background: C.panel, padding: "12px 14px", borderRadius: 8, border: `1px solid ${C.border}`, wordBreak: "break-all" }}>POST {API}/leads/submit-to-fiesta</code>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 10 }}>Webhook URL</div>
+        <div style={{ fontSize: 12.5, color: C.textSoft, marginBottom: 10 }}>Send leads from your landing pages here:</div>
+        <code style={{ display: "block", fontSize: 12, color: C.mint, background: C.panel, padding: "12px 14px", borderRadius: 8, border: `1px solid ${C.border}`, wordBreak: "break-all" }}>POST {API}/leads/webhook</code>
       </Crd>
       <Crd style={{ padding: "22px 24px" }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 10 }}>Platform</div>
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", fontSize: 12.5 }}>
-          <span style={{ color: C.textDim, fontWeight: 600 }}>Website</span><span style={{ color: C.sky }}>teprestamoshoy.es</span>
+          <span style={{ color: C.textDim, fontWeight: 600 }}>Website</span><span style={{ color: C.sky }}>teprestamos.es</span>
           <span style={{ color: C.textDim, fontWeight: 600 }}>Backend</span><span style={{ color: C.sky }}>Railway (Node.js + PostgreSQL)</span>
           <span style={{ color: C.textDim, fontWeight: 600 }}>Dashboard</span><span style={{ color: C.sky }}>Next.js on Vercel</span>
-          <span style={{ color: C.textDim, fontWeight: 600 }}>Lender</span><span style={{ color: C.sky }}>FiestaCredito (Async)</span>
         </div>
       </Crd>
     </div>
@@ -580,8 +478,8 @@ export default function DashboardPage() {
       <aside style={{ width: 220, background: C.panel, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ padding: "22px 20px 18px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="/RouteIQ_Icon.svg" alt="RouteIQ" style={{ width: 32, height: 32, marginRight: -11 }} />
-            <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>RouteIQ</div><div style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>Lead Management</div>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: `linear-gradient(135deg, ${C.mint}, ${C.sky})`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, color: C.bg }}>TP</div>
+            <div><div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>TePrestamos</div><div style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>Admin Panel</div></div>
           </div>
         </div>
         <nav style={{ padding: "14px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
