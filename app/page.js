@@ -534,11 +534,177 @@ function SettingsPage() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// FUNNEL PAGE
+// ═══════════════════════════════════════════════════════════════════
+
+const FUNNEL_STEPS = [
+  { step: "simulator", num: 0, label: "Simulator", desc: "Landing page with calculator" },
+  { step: "step_1", num: 1, label: "Step 1", desc: "Loan Purpose" },
+  { step: "step_2", num: 2, label: "Step 2", desc: "Personal Info" },
+  { step: "step_3", num: 3, label: "Step 3", desc: "Contact Details" },
+  { step: "step_4", num: 4, label: "Step 4", desc: "Address" },
+  { step: "step_5", num: 5, label: "Step 5", desc: "Employment & Finance" },
+  { step: "step_6", num: 6, label: "Step 6", desc: "Banking" },
+  { step: "step_7", num: 7, label: "Step 7", desc: "Consent & Submit" },
+  { step: "submitted", num: 8, label: "Submitted", desc: "Redirected to lender" },
+];
+
+function FunnelPage() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const d = await apiFetch(`/analytics/funnel?days=${days}`);
+      setData(d);
+    } catch (e) { console.error("Funnel load error:", e); }
+    setLoading(false);
+  }, [days]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading && !data) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spin sz={28} /></div>;
+
+  const stepsMap = {};
+  (data?.steps || []).forEach(s => { stepsMap[s.step] = parseInt(s.sessions); });
+
+  const funnelData = FUNNEL_STEPS.map(fs => ({
+    ...fs,
+    sessions: stepsMap[fs.step] || 0,
+  }));
+
+  const maxSessions = Math.max(...funnelData.map(f => f.sessions), 1);
+  const totalSessions = data?.totalSessions || 0;
+
+  const completions = funnelData.find(f => f.step === "submitted")?.sessions || 0;
+  const conversionRate = totalSessions > 0 ? ((completions / totalSessions) * 100).toFixed(1) : "0.0";
+
+  const step1 = funnelData.find(f => f.step === "step_1")?.sessions || 0;
+  const simulatorToForm = totalSessions > 0 ? ((step1 / totalSessions) * 100).toFixed(1) : "0.0";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Controls */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {[7, 14, 30, 90].map(d => (
+            <Btn key={d} v={days === d ? "primary" : "default"} sz="sm" onClick={() => setDays(d)}>
+              {d}d
+            </Btn>
+          ))}
+        </div>
+        <Btn v="default" sz="sm" onClick={load} disabled={loading}>
+          <RefreshIcon spinning={loading} /> Refresh
+        </Btn>
+      </div>
+
+      {/* Summary stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <Stat label="Unique Visitors" value={fm.num(totalSessions)} icon="👁" color={C.sky} />
+        <Stat label="Form Started" value={fm.num(step1)} sub={`${simulatorToForm}% of visitors`} icon="✏️" color={C.gold} />
+        <Stat label="Submissions" value={fm.num(completions)} icon="✓" color={C.mint} />
+        <Stat label="Conversion Rate" value={`${conversionRate}%`} sub="Visitor → Submit" icon="⚡" color={conversionRate >= 5 ? C.mint : conversionRate >= 2 ? C.gold : C.red} />
+      </div>
+
+      {/* Visual funnel */}
+      <Crd style={{ padding: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 18 }}>Conversion Funnel</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {funnelData.map((f, i) => {
+            const pct = maxSessions > 0 ? (f.sessions / maxSessions) * 100 : 0;
+            const prev = i > 0 ? funnelData[i - 1].sessions : f.sessions;
+            const dropPct = prev > 0 ? (((prev - f.sessions) / prev) * 100).toFixed(1) : "0.0";
+            const isSubmitted = f.step === "submitted";
+
+            return (
+              <div key={f.step} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 100, flexShrink: 0, textAlign: "right" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: isSubmitted ? C.mint : C.text }}>{f.label}</div>
+                  <div style={{ fontSize: 10, color: C.textDim }}>{f.desc}</div>
+                </div>
+                <div style={{ flex: 1, position: "relative", height: 32, background: C.panel, borderRadius: 6, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${Math.max(pct, 1)}%`,
+                    background: isSubmitted
+                      ? `linear-gradient(90deg, ${C.mint}, ${C.mintGlow})`
+                      : `linear-gradient(90deg, ${C.sky}, ${C.skyDim})`,
+                    borderRadius: 6,
+                    transition: "width .5s ease",
+                    opacity: f.sessions > 0 ? 1 : 0.2,
+                  }} />
+                  <div style={{ position: "absolute", top: 0, left: 10, height: "100%", display: "flex", alignItems: "center", fontSize: 12, fontWeight: 800, color: C.text }}>
+                    {fm.num(f.sessions)}
+                  </div>
+                </div>
+                <div style={{ width: 60, flexShrink: 0, textAlign: "right" }}>
+                  {i > 0 && prev > 0 && f.sessions < prev ? (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: C.red }}>−{dropPct}%</span>
+                  ) : i === 0 ? (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: C.textDim }}>entry</span>
+                  ) : (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: C.mint }}>0%</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Crd>
+
+      {/* Drop-off analysis */}
+      {data?.dropoff && Object.keys(data.dropoff).length > 0 && (
+        <Crd style={{ padding: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 14 }}>Drop-off Analysis</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 14 }}>Where visitors abandoned (furthest step reached)</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {FUNNEL_STEPS.map(fs => {
+              const count = data.dropoff[fs.num] || 0;
+              if (count === 0) return null;
+              const pctOfTotal = totalSessions > 0 ? ((count / totalSessions) * 100).toFixed(1) : "0.0";
+              const isLast = fs.step === "submitted";
+              return (
+                <div key={fs.step} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+                  <div style={{ width: 100, fontSize: 12, fontWeight: 600, color: isLast ? C.mint : C.textSoft, textAlign: "right" }}>{fs.label}</div>
+                  <div style={{ flex: 1, height: 8, background: C.panel, borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%",
+                      width: `${pctOfTotal}%`,
+                      background: isLast ? C.mint : C.red,
+                      borderRadius: 4,
+                      opacity: isLast ? 1 : 0.7,
+                    }} />
+                  </div>
+                  <div style={{ width: 80, textAlign: "right", fontSize: 11.5 }}>
+                    <span style={{ fontWeight: 800, color: isLast ? C.mint : C.red }}>{count}</span>
+                    <span style={{ color: C.textDim, marginLeft: 4 }}>({pctOfTotal}%)</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Crd>
+      )}
+
+      {/* Empty state */}
+      {totalSessions === 0 && !loading && (
+        <Crd style={{ padding: 40 }}>
+          <Empty icon="📊" title="No funnel data yet" sub="Events will appear once the tracking snippet is installed on teprestamoshoy.es" />
+        </Crd>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // MAIN APP SHELL
 // ═══════════════════════════════════════════════════════════════════
 const NAV = [
   { id: "overview", label: "Overview", icon: "◐" },
   { id: "leads", label: "Leads", icon: "☰" },
+  { id: "funnel", label: "Funnel", icon: "▽" },
   { id: "lenders", label: "Lenders", icon: "⬡" },
   { id: "analytics", label: "Analytics", icon: "◧" },
   { id: "settings", label: "Settings", icon: "⚙" },
@@ -593,6 +759,7 @@ export default function DashboardPage() {
         <div style={{ padding: 24, flex: 1, animation: "fadeIn .3s ease-out" }} key={page}>
           {page === "overview" && <OverviewPage />}
           {page === "leads" && <LeadsPage />}
+          {page === "funnel" && <FunnelPage />}
           {page === "lenders" && <LendersPage />}
           {page === "analytics" && <AnalyticsPage />}
           {page === "settings" && <SettingsPage />}
