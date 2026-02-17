@@ -236,7 +236,7 @@ function LeadsPage() {
         {pg.totalPages > 1 && (<div style={{ display: "flex", justifyContent: "center", gap: 10, padding: 14, borderTop: `1px solid ${C.border}` }}><Btn sz="sm" v="ghost" disabled={filters.page <= 1} onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}>← Prev</Btn><span style={{ fontSize: 11.5, color: C.textDim, alignSelf: "center" }}>{pg.page} / {pg.totalPages}</span><Btn sz="sm" v="ghost" disabled={filters.page >= pg.totalPages} onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))}>Next →</Btn></div>)}
       </Crd>
 
-      <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); }} title={selected ? `Lead #${selected.id} — ${selected.first_name} ${selected.last_name}` : ""} w={660}>
+      <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); }} title={selected ? `Lead #${selected.id} — ${selected.first_name} ${selected.last_name}` : ""} w={700}>
         {detailLoading ? <div style={{ textAlign: "center", padding: 44 }}><Spin sz={26} /></div> : detail?.lead ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -244,6 +244,40 @@ function LeadsPage() {
                 <div key={k}><div style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>{k}</div>{node || <div style={{ fontSize: 13, color: v ? C.text : C.textDim }}>{v || "—"}</div>}</div>
               ))}
             </div>
+
+            {/* FiestaCredito Details */}
+            {(detail.lead.fiesta_lead_id || detail.lead.redirect_url || detail.lead.response_time_ms || detail.lead.rejection_reason || detail.lead.revenue > 0 || detail.lead.distributed_at) && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>FiestaCredito Details</div>
+                <div style={{ padding: "14px 16px", background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  {detail.lead.fiesta_lead_id && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Fiesta Lead ID</div><div style={{ fontSize: 12, color: C.text, marginTop: 2, fontFamily: "monospace" }}>{detail.lead.fiesta_lead_id}</div></div>)}
+                  {detail.lead.response_time_ms != null && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Response Time</div><div style={{ fontSize: 14, color: C.sky, fontWeight: 800, marginTop: 2 }}>{fm.ms(detail.lead.response_time_ms)}</div></div>)}
+                  {detail.lead.distributed_at && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Distributed At</div><div style={{ fontSize: 12, color: C.text, marginTop: 2 }}>{fm.dt(detail.lead.distributed_at)}</div></div>)}
+                  {parseFloat(detail.lead.revenue) > 0 && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Revenue</div><div style={{ fontSize: 14, color: C.gold, fontWeight: 800, marginTop: 2 }}>{fm.eur(detail.lead.revenue)}</div></div>)}
+                  {detail.lead.redirect_url && (<div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect URL</div><div style={{ fontSize: 11, color: C.sky, marginTop: 2, wordBreak: "break-all", fontFamily: "monospace" }}>{detail.lead.redirect_url}</div></div>)}
+                  {detail.lead.rejection_reason && (<div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Rejection Reason</div><div style={{ fontSize: 12, color: C.red, marginTop: 2 }}>{detail.lead.rejection_reason}</div></div>)}
+                </div>
+              </div>
+            )}
+
+            {/* Postback Events */}
+            {detail.postbacks?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Postback Events</div>
+                {detail.postbacks.map((pb, i) => (
+                  <div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{pb.event}</div>
+                      <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{fm.dt(pb.created_at)} · Event ID: {pb.event_id || "—"}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      {parseFloat(pb.payout) > 0 && <div style={{ fontSize: 14, fontWeight: 800, color: C.gold }}>{fm.eur(pb.payout)}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {detail.distributions?.length > 0 && (<div><div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Distribution History</div>{detail.distributions.map((d, i) => (<div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}><div><div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{d.lender_name}</div><div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Sent {fm.dt(d.sent_at)} · {fm.ms(d.response_time_ms)} response</div></div><div style={{ textAlign: "right" }}><Badge status={d.was_purchased ? "sold" : d.response_status === "rejected" ? "rejected" : "distributed"} />{d.sale_price != null && <div style={{ fontSize: 12, fontWeight: 800, color: C.mint, marginTop: 4 }}>{fm.eur(d.sale_price)}</div>}</div></div>))}</div>)}
           </div>
         ) : <Empty icon="⚠️" title="Could not load lead details" />}
