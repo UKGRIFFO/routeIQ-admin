@@ -151,7 +151,7 @@ function OverviewPage() {
         <Stat label="Total Leads" value={fm.num(s.totalLeads)} sub={`${fm.num(s.leadsToday)} today`} color={C.sky} icon="📋" />
         <Stat label="Sold" value={fm.num(s.soldLeads)} sub={`${fm.pct(conv)} conversion`} color={C.mint} icon="✓" />
         <Stat label="Revenue" value={fm.eur(s.totalRevenue)} sub={`${fm.eur(avgRev)} per sale`} color={C.gold} icon="€" />
-        <Stat label="Redirect Rate" value={s.submittedToLender > 0 ? fm.pct(redirectRate) : "—"} sub={`${fm.num(s.redirectedLeads || 0)} of ${fm.num(s.submittedToLender || 0)} sent`} color={redirectRate >= 0.9 ? C.mint : redirectRate >= 0.7 ? C.gold : C.red} icon="↗" />
+        <Stat label="Redirect Rate" value={s.submittedToLender > 0 ? fm.pct(redirectRate) : "—"} sub={`${fm.num(s.confirmedRedirects || 0)} confirmed · ${fm.num(s.redirectedLeads || 0)} of ${fm.num(s.submittedToLender || 0)} sent`} color={redirectRate >= 0.9 ? C.mint : redirectRate >= 0.7 ? C.gold : C.red} icon="↗" />
         <Stat label="This Week" value={fm.num(s.leadsThisWeek)} sub={`${fm.num(s.leadsThisMonth)} this month`} color={C.violet} icon="📈" />
         <Stat label="Avg Response" value={s.avgResponseTimeMs ? fm.ms(s.avgResponseTimeMs) : "—"} sub={s.avgResponseTimeMs ? fm.msRaw(s.avgResponseTimeMs) : "no data"} color={C.cyan} icon="⚡" />
       </div>
@@ -239,8 +239,8 @@ function LeadsPage() {
 
   const exportCSV = () => {
     if (!leads.length) return;
-    const hdr = ["ID", "First Name", "Last Name", "Email", "Phone", "Loan Amount", "Status", "Redirected", "Revenue", "Response Time", "Source", "Created"];
-    const rows = leads.map(l => [l.id, l.first_name, l.last_name, l.email, l.phone, l.loan_amount, l.status, l.redirect_url ? "Yes" : l.status === "rejected_by_lender" ? "No" : "Pending", l.revenue || 0, l.response_time_ms || "", l.source, l.created_at]);
+    const hdr = ["ID", "First Name", "Last Name", "Email", "Phone", "Loan Amount", "Status", "Redirect", "Revenue", "Response Time", "Source", "Created"];
+    const rows = leads.map(l => [l.id, l.first_name, l.last_name, l.email, l.phone, l.loan_amount, l.status, (l.status === 'redirected' || l.status === 'accepted' || l.status === 'sold' || l.status === 'completed') ? "Confirmed" : l.redirect_url ? "Accepted" : l.status === "rejected_by_lender" ? "Rejected" : "Pending", l.revenue || 0, l.response_time_ms || "", l.source, l.created_at]);
     const csv = [hdr, ...rows].map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   };
@@ -278,7 +278,7 @@ function LeadsPage() {
                   <td style={{ padding: "9px 14px", fontWeight: 700, color: C.gold, fontVariantNumeric: "tabular-nums" }}>{fm.eur(l.loan_amount)}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11.5 }}>{l.loan_purpose || "—"}</td>
                   <td style={{ padding: "9px 14px" }}><Badge status={l.status} /></td>
-                  <td style={{ padding: "9px 14px", textAlign: "center" }}>{l.redirect_url ? <span style={{ color: C.mint, fontWeight: 800, fontSize: 13 }}>✓</span> : l.status === "rejected_by_lender" ? <span style={{ color: C.red, fontWeight: 800, fontSize: 13 }}>✕</span> : <span style={{ color: C.textGhost }}>—</span>}</td>
+                  <td style={{ padding: "9px 14px", textAlign: "center" }}>{l.status === 'redirected' || l.status === 'accepted' || l.status === 'sold' || l.status === 'completed' ? <span title="Confirmed redirected" style={{ color: C.mint, fontWeight: 800, fontSize: 13 }}>✓✓</span> : l.redirect_url && l.status === 'distributed' ? <span title="Accepted, awaiting redirect confirmation" style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>✓</span> : l.status === "rejected_by_lender" ? <span style={{ color: C.red, fontWeight: 800, fontSize: 13 }}>✕</span> : <span style={{ color: C.textGhost }}>—</span>}</td>
                   <td style={{ padding: "9px 14px", fontWeight: 800, color: parseFloat(l.revenue) > 0 ? C.mint : C.textGhost, fontVariantNumeric: "tabular-nums" }}>{parseFloat(l.revenue) > 0 ? fm.eur(l.revenue) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: l.response_time_ms ? C.cyan : C.textGhost, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontSize: 11.5 }}>{l.response_time_ms ? fm.ms(l.response_time_ms) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11 }}>{l.source}</td>
@@ -304,7 +304,7 @@ function LeadsPage() {
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>FiestaCredito Details</div>
                 <div style={{ padding: "14px 16px", background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect Status</div><div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: detail.lead.redirect_url ? C.mint : detail.lead.status === "rejected_by_lender" ? C.red : C.gold }}>{detail.lead.redirect_url ? "✓ Redirected" : detail.lead.status === "rejected_by_lender" ? "✕ Rejected" : "⏳ Pending"}</div></div>
+                  <div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect Status</div><div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: detail.lead.status === 'redirected' || detail.lead.status === 'accepted' || detail.lead.status === 'sold' || detail.lead.status === 'completed' ? C.mint : detail.lead.redirect_url ? C.gold : detail.lead.status === "rejected_by_lender" ? C.red : C.gold }}>{detail.lead.status === 'redirected' || detail.lead.status === 'accepted' || detail.lead.status === 'sold' || detail.lead.status === 'completed' ? "✓✓ Confirmed Redirected" : detail.lead.redirect_url ? "✓ Accepted (not confirmed)" : detail.lead.status === "rejected_by_lender" ? "✕ Rejected" : "⏳ Pending"}</div></div>
                   {detail.lead.fiesta_lead_id && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Fiesta Lead ID</div><div style={{ fontSize: 12, color: C.text, marginTop: 2, fontFamily: "monospace" }}>{detail.lead.fiesta_lead_id}</div></div>)}
                   {detail.lead.response_time_ms != null && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Response Time</div><div style={{ fontSize: 14, color: C.cyan, fontWeight: 800, marginTop: 2 }}>{fm.ms(detail.lead.response_time_ms)} <span style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>({fm.msRaw(detail.lead.response_time_ms)})</span></div></div>)}
                   {detail.lead.distributed_at && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Distributed At</div><div style={{ fontSize: 12, color: C.text, marginTop: 2 }}>{fm.dt(detail.lead.distributed_at)}</div></div>)}
@@ -334,6 +334,28 @@ function LeadsPage() {
             )}
 
             {detail.distributions?.length > 0 && (<div><div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Distribution History</div>{detail.distributions.map((d, i) => (<div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}><div><div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{d.lender_name}</div><div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Sent {fm.dt(d.sent_at)} · {fm.ms(d.response_time_ms)} response</div></div><div style={{ textAlign: "right" }}><Badge status={d.was_purchased ? "sold" : d.response_status === "rejected" ? "rejected" : "distributed"} />{d.sale_price != null && <div style={{ fontSize: 12, fontWeight: 800, color: C.mint, marginTop: 4 }}>{fm.eur(d.sale_price)}</div>}</div></div>))}</div>)}
+
+            {/* Redirect Confirmation Log */}
+            {detail.redirectLogs?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Redirect Confirmation Log</div>
+                {detail.redirectLogs.map((rl, i) => (
+                  <div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, border: `1px solid ${C.mint}30`, marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: C.mint }}>✓✓ Browser confirmed redirect</div>
+                        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{fm.dt(rl.created_at)}</div>
+                      </div>
+                      <div style={{ textAlign: "right", fontSize: 10.5, color: C.textDim }}>
+                        IP: {rl.ip_address || "—"}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10.5, color: C.sky, marginTop: 6, wordBreak: "break-all", fontFamily: "monospace" }}>{rl.destination_url}</div>
+                    {rl.user_agent && <div style={{ fontSize: 9.5, color: C.textGhost, marginTop: 4, wordBreak: "break-all" }}>{rl.user_agent}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : <Empty icon="⚠️" title="Could not load lead details" />}
       </Modal>
@@ -615,7 +637,7 @@ function FunnelPage() {
         <Stat label="Form Started" value={fm.num(step1)} sub={`${simulatorToForm}% of visitors`} icon="✏️" color={C.gold} />
         <Stat label="Submissions" value={fm.num(completions)} icon="✓" color={C.mint} />
         <Stat label="Funnel Rate" value={`${conversionRate}%`} sub="Visitor → Submit" icon="⚡" color={conversionRate >= 5 ? C.mint : conversionRate >= 2 ? C.gold : C.red} />
-        <Stat label="Redirect Rate" value={summary?.submittedToLender > 0 ? fm.pct(summary.redirectedLeads / summary.submittedToLender) : "—"} sub={`${fm.num(summary?.redirectedLeads || 0)} of ${fm.num(summary?.submittedToLender || 0)} accepted`} icon="↗" color={summary?.submittedToLender > 0 ? (summary.redirectedLeads / summary.submittedToLender >= 0.9 ? C.mint : summary.redirectedLeads / summary.submittedToLender >= 0.7 ? C.gold : C.red) : C.textDim} />
+        <Stat label="Redirect Rate" value={summary?.submittedToLender > 0 ? fm.pct(summary.redirectedLeads / summary.submittedToLender) : "—"} sub={`${fm.num(summary?.confirmedRedirects || 0)} confirmed of ${fm.num(summary?.redirectedLeads || 0)} accepted`} icon="↗" color={summary?.submittedToLender > 0 ? (summary.redirectedLeads / summary.submittedToLender >= 0.9 ? C.mint : summary.redirectedLeads / summary.submittedToLender >= 0.7 ? C.gold : C.red) : C.textDim} />
       </div>
 
       {/* Post-submission pipeline */}
@@ -625,25 +647,18 @@ function FunnelPage() {
           <div style={{ fontSize: 11, color: C.textDim, marginBottom: 18 }}>What happens after a lead is submitted to lender</div>
           <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
             {[
-              { label: "Submitted", value: summary.submittedToLender, color: C.sky },
-              { label: "Redirected", value: summary.redirectedLeads, color: C.mint },
-              { label: "Rejected", value: summary.submittedToLender - summary.redirectedLeads, color: C.red },
-            ].map((stage, i) => (
-              <div key={stage.label} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : 0 }}>
+              { label: "Submitted", value: summary.submittedToLender, color: C.sky, pct: "100%" },
+              { label: "Accepted", value: summary.redirectedLeads, color: C.gold, pct: summary.submittedToLender > 0 ? fm.pct(summary.redirectedLeads / summary.submittedToLender) : "0%" },
+              { label: "Confirmed Redirect", value: summary.confirmedRedirects || 0, color: C.mint, pct: summary.redirectedLeads > 0 ? fm.pct((summary.confirmedRedirects || 0) / summary.redirectedLeads) : "0%" },
+              { label: "Rejected", value: summary.submittedToLender - summary.redirectedLeads, color: C.red, pct: summary.submittedToLender > 0 ? fm.pct((summary.submittedToLender - summary.redirectedLeads) / summary.submittedToLender) : "0%" },
+            ].map((stage, i, arr) => (
+              <div key={stage.label} style={{ display: "flex", alignItems: "center", flex: i < arr.length - 1 ? 1 : 0 }}>
                 <div style={{ textAlign: "center", minWidth: 100 }}>
                   <div style={{ fontSize: 28, fontWeight: 900, color: stage.color, lineHeight: 1 }}>{stage.value}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.textSoft, marginTop: 4 }}>{stage.label}</div>
-                  {i === 0 && summary.submittedToLender > 0 && (
-                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>100%</div>
-                  )}
-                  {i === 1 && summary.submittedToLender > 0 && (
-                    <div style={{ fontSize: 10, color: C.mint, marginTop: 2 }}>{fm.pct(summary.redirectedLeads / summary.submittedToLender)}</div>
-                  )}
-                  {i === 2 && summary.submittedToLender > 0 && (
-                    <div style={{ fontSize: 10, color: C.red, marginTop: 2 }}>{fm.pct((summary.submittedToLender - summary.redirectedLeads) / summary.submittedToLender)}</div>
-                  )}
+                  <div style={{ fontSize: 10, color: stage.color, marginTop: 2 }}>{stage.pct}</div>
                 </div>
-                {i < 2 && (
+                {i < arr.length - 1 && (
                   <div style={{ flex: 1, height: 2, background: C.border, margin: "0 12px", position: "relative" }}>
                     <div style={{ position: "absolute", right: -4, top: -4, fontSize: 10, color: C.textGhost }}>→</div>
                   </div>
