@@ -67,7 +67,7 @@ const RefreshIcon = ({ spinning }) => (
   </svg>
 );
 
-const Badge = ({ status }) => { const s = STATUS[status] || STATUS.new; return (<span title={s.tip} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 99, fontSize: 10.5, fontWeight: 700, background: s.bg, color: s.fg, letterSpacing: ".04em", textTransform: "uppercase", cursor: s.tip ? "help" : "default" }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: s.fg }} />{s.label}</span>); };
+const Badge = ({ status }) => { const s = STATUS[status] || STATUS.new; return (<span title={s.tip} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 99, fontSize: 10.5, fontWeight: 700, background: s.bg, color: s.fg, letterSpacing: ".04em", textTransform: "uppercase", cursor: s.tip ? "help" : "default", whiteSpace: "nowrap" }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: s.fg }} />{s.label}</span>); };
 
 const Spin = ({ sz = 18 }) => (<svg width={sz} height={sz} viewBox="0 0 24 24" style={{ animation: "spin .8s linear infinite" }}><circle cx="12" cy="12" r="10" stroke={C.border} strokeWidth="2.5" fill="none" /><path d="M12 2a10 10 0 0 1 10 10" stroke={C.mint} strokeWidth="2.5" fill="none" strokeLinecap="round" /></svg>);
 
