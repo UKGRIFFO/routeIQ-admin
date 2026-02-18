@@ -94,9 +94,186 @@ const Stat = ({ label, value, sub, color = C.mint, icon, tip }) => (<Crd style={
 const ChartTip = ({ active, payload, label, fmtLabel, fmtValue }) => { if (!active || !payload?.length) return null; return (<div style={{ background: C.card, border: `1px solid ${C.borderLight}`, borderRadius: 10, padding: "10px 14px", fontSize: 12, boxShadow: "0 8px 30px rgba(0,0,0,.4)" }}><div style={{ color: C.textSoft, fontWeight: 600, marginBottom: 6 }}>{fmtLabel ? fmtLabel(label) : label}</div>{payload.map((p, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: p.color }} /><span style={{ color: C.textSoft }}>{p.name}:</span><span style={{ color: C.text, fontWeight: 700 }}>{fmtValue ? fmtValue(p.value, p.name) : p.value}</span></div>))}</div>); };
 
 // ═══════════════════════════════════════════════════════════════════
+// DATE RANGE PICKER
+// ═══════════════════════════════════════════════════════════════════
+
+function calcRange(preset) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+
+  switch (preset) {
+    case "today": return { from: today, to: tomorrow, label: "Today", days: 1 };
+    case "yesterday": return { from: yesterday, to: today, label: "Yesterday", days: 1 };
+    case "7d": { const f = new Date(today); f.setDate(today.getDate() - 7); return { from: f, to: tomorrow, label: "Last 7 Days", days: 7 }; }
+    case "14d": { const f = new Date(today); f.setDate(today.getDate() - 14); return { from: f, to: tomorrow, label: "Last 14 Days", days: 14 }; }
+    case "thisMonth": { const f = new Date(today.getFullYear(), today.getMonth(), 1); return { from: f, to: tomorrow, label: "This Month", days: Math.ceil((tomorrow - f) / 86400000) }; }
+    case "30d": { const f = new Date(today); f.setDate(today.getDate() - 30); return { from: f, to: tomorrow, label: "Last 30 Days", days: 30 }; }
+    case "lastMonth": { const f = new Date(today.getFullYear(), today.getMonth() - 1, 1); const t = new Date(today.getFullYear(), today.getMonth(), 1); return { from: f, to: t, label: "Last Month", days: Math.ceil((t - f) / 86400000) }; }
+    case "all": default: return { from: null, to: null, label: "All Time", days: 0 };
+  }
+}
+
+function fmtDate(d) { return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
+
+function MiniCalendar({ month, year, rangeStart, rangeEnd, onDayClick, onMonthChange }) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const shift = firstDay === 0 ? 6 : firstDay - 1; // Mon start
+  const cells = [];
+  for (let i = 0; i < shift; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <button onClick={() => onMonthChange(-1)} style={{ background: "none", border: "none", color: C.textSoft, cursor: "pointer", fontSize: 14, padding: "2px 6px" }}>‹</button>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{new Date(year, month).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</span>
+        <button onClick={() => onMonthChange(1)} style={{ background: "none", border: "none", color: C.textSoft, cursor: "pointer", fontSize: 14, padding: "2px 6px" }}>›</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1 }}>
+        {["M","T","W","T","F","S","S"].map((d, i) => (
+          <div key={i} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: C.textGhost, padding: "4px 0" }}>{d}</div>
+        ))}
+        {cells.map((d, i) => {
+          if (!d) return <div key={`e${i}`} />;
+          const date = new Date(year, month, d); date.setHours(0,0,0,0);
+          const isToday = date.getTime() === today.getTime();
+          const isStart = rangeStart && date.getTime() === rangeStart.getTime();
+          const isEnd = rangeEnd && date.getTime() === rangeEnd.getTime();
+          const inRange = rangeStart && rangeEnd && date >= rangeStart && date <= rangeEnd;
+          const isFuture = date > today;
+
+          return (
+            <button key={d} onClick={() => !isFuture && onDayClick(date)} style={{
+              width: 28, height: 28, borderRadius: isStart || isEnd ? 6 : 3, border: isToday ? `1px solid ${C.mint}` : "1px solid transparent",
+              background: isStart || isEnd ? C.mint : inRange ? C.mintDim : "transparent",
+              color: isStart || isEnd ? C.bg : isFuture ? C.textGhost : inRange ? C.mint : C.textSoft,
+              fontSize: 11, fontWeight: isStart || isEnd ? 800 : 600, cursor: isFuture ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit",
+            }}>{d}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DateRangePicker({ dateRange, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [pickStart, setPickStart] = useState(null);
+  const [pickEnd, setPickEnd] = useState(null);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const presets = [
+    { id: "today", label: "Today" },
+    { id: "yesterday", label: "Yesterday" },
+    { id: "7d", label: "Last 7 Days" },
+    { id: "14d", label: "Last 14 Days" },
+    { id: "thisMonth", label: "This Month" },
+    { id: "30d", label: "Last 30 Days" },
+    { id: "lastMonth", label: "Last Month" },
+    { id: "all", label: "All Time" },
+  ];
+
+  const selectPreset = (id) => {
+    const r = calcRange(id);
+    onChange({ preset: id, from: r.from, to: r.to, label: r.label, days: r.days });
+    setOpen(false);
+  };
+
+  const handleDayClick = (date) => {
+    if (!pickStart || (pickStart && pickEnd)) {
+      setPickStart(date); setPickEnd(null);
+    } else {
+      const start = date < pickStart ? date : pickStart;
+      const end = date < pickStart ? pickStart : date;
+      const days = Math.ceil((end - start) / 86400000) + 1;
+      const endPlusOne = new Date(end); endPlusOne.setDate(end.getDate() + 1);
+      setPickStart(start); setPickEnd(end);
+      onChange({ preset: "custom", from: start, to: endPlusOne, label: `${fmtDate(start)} – ${fmtDate(end)}`, days });
+      setOpen(false);
+    }
+  };
+
+  const handleMonthChange = (dir) => {
+    let m = calMonth + dir, y = calYear;
+    if (m > 11) { m = 0; y++; } else if (m < 0) { m = 11; y--; }
+    setCalMonth(m); setCalYear(y);
+  };
+
+  const navigate = (dir) => {
+    if (!dateRange.from || dateRange.preset === "all") return;
+    const shift = (dateRange.days || 1) * dir;
+    const newFrom = new Date(dateRange.from); newFrom.setDate(newFrom.getDate() + shift);
+    const newTo = new Date(dateRange.to); newTo.setDate(newTo.getDate() + shift);
+    const now = new Date(); now.setHours(23,59,59,999);
+    if (newFrom > now) return;
+    if (newTo > new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)) {
+      newTo.setTime(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime());
+    }
+    onChange({ ...dateRange, from: newFrom, to: newTo, preset: "custom", label: `${fmtDate(newFrom)} – ${fmtDate(new Date(newTo.getTime() - 86400000))}` });
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center", gap: 4 }}>
+      <button onClick={() => navigate(-1)} title="Previous period" style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: dateRange.preset === "all" ? C.textGhost : C.textSoft, cursor: dateRange.preset === "all" ? "not-allowed" : "pointer", padding: "5px 8px", fontSize: 12, fontFamily: "inherit", display: "flex", alignItems: "center" }}>‹</button>
+      <button onClick={() => setOpen(!open)} style={{ background: open ? C.mintDim : C.card, border: `1px solid ${open ? C.mint : C.border}`, borderRadius: 8, color: open ? C.mint : C.text, cursor: "pointer", padding: "6px 14px", fontSize: 12, fontWeight: 700, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 13 }}>📅</span>
+        {dateRange.label}
+        <span style={{ fontSize: 9, opacity: .5 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      <button onClick={() => navigate(1)} title="Next period" style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: dateRange.preset === "all" ? C.textGhost : C.textSoft, cursor: dateRange.preset === "all" ? "not-allowed" : "pointer", padding: "5px 8px", fontSize: 12, fontFamily: "inherit", display: "flex", alignItems: "center" }}>›</button>
+
+      {open && (
+        <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, background: C.card, border: `1px solid ${C.borderLight}`, borderRadius: 14, boxShadow: "0 16px 50px rgba(0,0,0,.5)", zIndex: 999, display: "flex", overflow: "hidden", minWidth: 420 }}>
+          {/* Presets */}
+          <div style={{ padding: "12px 8px", borderRight: `1px solid ${C.border}`, minWidth: 140 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".08em", padding: "6px 10px", marginBottom: 4 }}>Quick Select</div>
+            {presets.map(p => (
+              <button key={p.id} onClick={() => selectPreset(p.id)} style={{
+                display: "block", width: "100%", textAlign: "left", padding: "7px 10px", borderRadius: 6, border: "none",
+                background: dateRange.preset === p.id ? C.mintDim : "transparent", color: dateRange.preset === p.id ? C.mint : C.textSoft,
+                fontSize: 12, fontWeight: dateRange.preset === p.id ? 700 : 500, cursor: "pointer", fontFamily: "inherit", marginBottom: 1,
+              }}>{p.label}</button>
+            ))}
+          </div>
+          {/* Calendar */}
+          <div style={{ padding: 16, minWidth: 240 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>Custom Range</div>
+            <MiniCalendar month={calMonth} year={calYear} rangeStart={pickStart || dateRange.from} rangeEnd={pickEnd || (dateRange.to ? new Date(dateRange.to.getTime() - 86400000) : null)} onDayClick={handleDayClick} onMonthChange={handleMonthChange} />
+            {pickStart && !pickEnd && (
+              <div style={{ fontSize: 10, color: C.gold, marginTop: 8, textAlign: "center" }}>Click end date to complete range</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function dateParams(dateRange) {
+  const p = new URLSearchParams();
+  if (dateRange.from) p.set("from", dateRange.from.toISOString());
+  if (dateRange.to) p.set("to", dateRange.to.toISOString());
+  return p.toString();
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // OVERVIEW PAGE
 // ═══════════════════════════════════════════════════════════════════
-function OverviewPage() {
+function OverviewPage({ dateRange }) {
   const [summary, setSummary] = useState(null);
   const [daily, setDaily] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,19 +282,20 @@ function OverviewPage() {
   const [refreshing, setRefreshing] = useState(false);
   const intervalRef = useRef(null);
 
+  const dp = dateParams(dateRange);
   const loadData = useCallback((silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     Promise.all([
-      apiFetch("/analytics/summary").catch(() => null),
-      apiFetch("/analytics/daily?days=30").catch(() => null),
+      apiFetch(`/analytics/summary${dp ? `?${dp}` : ""}`).catch(() => null),
+      apiFetch(`/analytics/daily?days=30${dp ? `&${dp}` : ""}`).catch(() => null),
     ]).then(([s, d]) => {
       setSummary(s?.stats || null);
       setDaily(d?.analytics || []);
       setErr(!s && !d ? "Cannot reach backend — check Railway deployment" : null);
       setLastRefresh(new Date());
     }).finally(() => { setLoading(false); setRefreshing(false); });
-  }, []);
+  }, [dp]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -207,7 +385,7 @@ function OverviewPage() {
 // ═══════════════════════════════════════════════════════════════════
 // LEADS PAGE
 // ═══════════════════════════════════════════════════════════════════
-function LeadsPage() {
+function LeadsPage({ dateRange }) {
   const [leads, setLeads] = useState([]);
   const [pg, setPg] = useState({ page: 1, totalPages: 1, totalCount: 0 });
   const [filters, setFilters] = useState({ status: "", source: "", page: 1 });
@@ -225,8 +403,10 @@ function LeadsPage() {
     const p = new URLSearchParams({ page: filters.page, limit: 30 });
     if (filters.status) p.set("status", filters.status);
     if (filters.source) p.set("source", filters.source);
+    if (dateRange.from) p.set("from", dateRange.from.toISOString());
+    if (dateRange.to) p.set("to", dateRange.to.toISOString());
     apiFetch(`/leads?${p}`).then(d => { setLeads(d.leads || []); setPg(d.pagination || { page: 1, totalPages: 1, totalCount: 0 }); setLastRefresh(new Date()); }).catch(() => setLeads([])).finally(() => { setLoading(false); setRefreshing(false); });
-  }, [filters]);
+  }, [filters, dateRange]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -473,22 +653,18 @@ function LendersPage() {
 // ═══════════════════════════════════════════════════════════════════
 // ANALYTICS PAGE
 // ═══════════════════════════════════════════════════════════════════
-function AnalyticsPage() {
+function AnalyticsPage({ dateRange }) {
   const [daily, setDaily] = useState([]);
-  const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { setLoading(true); apiFetch(`/analytics/daily?days=${days}`).then(d => setDaily(d.analytics || [])).catch(() => setDaily([])).finally(() => setLoading(false)); }, [days]);
+  const dp = dateParams(dateRange);
+  useEffect(() => { setLoading(true); apiFetch(`/analytics/daily?days=90${dp ? `&${dp}` : ""}`).then(d => setDaily(d.analytics || [])).catch(() => setDaily([])).finally(() => setLoading(false)); }, [dp]);
 
   const t = daily.reduce((a, d) => ({ leads: a.leads + (d.total_leads || 0), sold: a.sold + (d.sold_leads || 0), rej: a.rej + (d.rejected_leads || 0), dupes: a.dupes + (d.duplicate_leads || 0), rev: a.rev + (Number(d.total_revenue) || 0) }), { leads: 0, sold: 0, rej: 0, dupes: 0, rev: 0 });
   const conv = t.leads > 0 ? t.sold / t.leads : 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: C.textDim }}>Period:</span>
-        {[7, 14, 30, 60, 90].map(d => <Btn key={d} sz="sm" v={days === d ? "primary" : "ghost"} onClick={() => setDays(d)}>{d}d</Btn>)}
-      </div>
       {loading ? <div style={{ textAlign: "center", padding: 80 }}><Spin sz={28} /></div> : (<>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 12 }}>
           <Stat label="Leads" value={fm.num(t.leads)} color={C.sky} tip="Total leads in selected period" />
@@ -575,24 +751,24 @@ const FUNNEL_STEPS = [
   { step: "submitted", num: 8, label: "Submitted", desc: "Redirected to lender" },
 ];
 
-function FunnelPage() {
+function FunnelPage({ dateRange }) {
   const [data, setData] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState(30);
 
+  const dp = dateParams(dateRange);
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [d, s] = await Promise.all([
-        apiFetch(`/analytics/funnel?days=${days}`),
-        apiFetch("/analytics/summary").catch(() => null),
+        apiFetch(`/analytics/funnel?days=90${dp ? `&${dp}` : ""}`),
+        apiFetch(`/analytics/summary${dp ? `?${dp}` : ""}`).catch(() => null),
       ]);
       setData(d);
       setSummary(s?.stats || null);
     } catch (e) { console.error("Funnel load error:", e); }
     setLoading(false);
-  }, [days]);
+  }, [dp]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -617,20 +793,6 @@ function FunnelPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Controls */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {[7, 14, 30, 90].map(d => (
-            <Btn key={d} v={days === d ? "primary" : "default"} sz="sm" onClick={() => setDays(d)}>
-              {d}d
-            </Btn>
-          ))}
-        </div>
-        <Btn v="default" sz="sm" onClick={load} disabled={loading}>
-          <RefreshIcon spinning={loading} /> Refresh
-        </Btn>
-      </div>
-
       {/* Summary stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14 }}>
         <Stat label="Unique Visitors" value={fm.num(totalSessions)} icon="👁" color={C.sky} tip="Unique browser sessions that loaded teprestamoshoy.es" />
@@ -774,6 +936,7 @@ const NAV = [
 export default function DashboardPage() {
   const [page, setPage] = useState("overview");
   const [time, setTime] = useState(new Date());
+  const [dateRange, setDateRange] = useState({ preset: "all", from: null, to: null, label: "All Time", days: 0 });
   const router = useRouter();
 
   useEffect(() => { const t = setInterval(() => setTime(new Date()), 60000); return () => clearInterval(t); }, []);
@@ -816,13 +979,14 @@ export default function DashboardPage() {
       <main style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <header style={{ padding: "16px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.panel, position: "sticky", top: 0, zIndex: 100 }}>
           <h1 style={{ fontSize: 18, fontWeight: 900, letterSpacing: "-.02em" }}>{NAV.find(n => n.id === page)?.label}</h1>
+          <DateRangePicker dateRange={dateRange} onChange={setDateRange} />
         </header>
         <div style={{ padding: 24, flex: 1, animation: "fadeIn .3s ease-out" }} key={page}>
-          {page === "overview" && <OverviewPage />}
-          {page === "leads" && <LeadsPage />}
-          {page === "funnel" && <FunnelPage />}
+          {page === "overview" && <OverviewPage dateRange={dateRange} />}
+          {page === "leads" && <LeadsPage dateRange={dateRange} />}
+          {page === "funnel" && <FunnelPage dateRange={dateRange} />}
           {page === "lenders" && <LendersPage />}
-          {page === "analytics" && <AnalyticsPage />}
+          {page === "analytics" && <AnalyticsPage dateRange={dateRange} />}
           {page === "settings" && <SettingsPage />}
         </div>
       </main>
