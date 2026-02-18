@@ -35,7 +35,7 @@ const STATUS = {
   sold:               { bg: C.mintDim, fg: C.mint, label: "Sold", tip: "Lead sold — revenue confirmed via postback" },
   completed:          { bg: C.mintDim, fg: C.mint, label: "Completed", tip: "Customer completed the loan process with lender" },
   rejected:           { bg: C.redDim, fg: C.red, label: "Rejected", tip: "Lead rejected during processing" },
-  rejected_by_lender: { bg: C.redDim, fg: C.red, label: "Rejected by Lender", tip: "Lender API rejected this lead (check rejection reason)" },
+  rejected_by_lender: { bg: C.redDim, fg: C.red, label: "Buyer Reject", tip: "Lender API rejected this lead (check rejection reason)" },
   duplicate:          { bg: C.goldDim, fg: C.gold, label: "Duplicate", tip: "Duplicate lead detected — same email/phone/name combo" },
   error:              { bg: C.roseDim, fg: C.rose, label: "Error", tip: "Something went wrong processing this lead" },
 };
