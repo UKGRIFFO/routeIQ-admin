@@ -181,8 +181,8 @@ function DateRangePicker({ dateRange, onChange }) {
     { id: "yesterday", label: "Yesterday" },
     { id: "7d", label: "Last 7 Days" },
     { id: "14d", label: "Last 14 Days" },
-    { id: "thisMonth", label: "This Month" },
     { id: "30d", label: "Last 30 Days" },
+    { id: "thisMonth", label: "This Month" },
     { id: "lastMonth", label: "Last Month" },
     { id: "all", label: "All Time" },
   ];
