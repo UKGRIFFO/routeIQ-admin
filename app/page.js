@@ -132,6 +132,7 @@ function OverviewPage() {
   const s = summary || {};
   const conv = s.totalLeads > 0 ? s.soldLeads / s.totalLeads : 0;
   const avgRev = s.soldLeads > 0 ? s.totalRevenue / s.soldLeads : 0;
+  const redirectRate = s.submittedToLender > 0 ? s.redirectedLeads / s.submittedToLender : 0;
   const PIE = [
     { name: "Sold", value: s.soldLeads || 0, color: C.mint },
     { name: "Unsold", value: Math.max(0, (s.totalLeads || 0) - (s.soldLeads || 0)), color: C.border },
@@ -150,6 +151,7 @@ function OverviewPage() {
         <Stat label="Total Leads" value={fm.num(s.totalLeads)} sub={`${fm.num(s.leadsToday)} today`} color={C.sky} icon="📋" />
         <Stat label="Sold" value={fm.num(s.soldLeads)} sub={`${fm.pct(conv)} conversion`} color={C.mint} icon="✓" />
         <Stat label="Revenue" value={fm.eur(s.totalRevenue)} sub={`${fm.eur(avgRev)} per sale`} color={C.gold} icon="€" />
+        <Stat label="Redirect Rate" value={s.submittedToLender > 0 ? fm.pct(redirectRate) : "—"} sub={`${fm.num(s.redirectedLeads || 0)} of ${fm.num(s.submittedToLender || 0)} sent`} color={redirectRate >= 0.9 ? C.mint : redirectRate >= 0.7 ? C.gold : C.red} icon="↗" />
         <Stat label="This Week" value={fm.num(s.leadsThisWeek)} sub={`${fm.num(s.leadsThisMonth)} this month`} color={C.violet} icon="📈" />
         <Stat label="Avg Response" value={s.avgResponseTimeMs ? fm.ms(s.avgResponseTimeMs) : "—"} sub={s.avgResponseTimeMs ? fm.msRaw(s.avgResponseTimeMs) : "no data"} color={C.cyan} icon="⚡" />
       </div>
@@ -237,8 +239,8 @@ function LeadsPage() {
 
   const exportCSV = () => {
     if (!leads.length) return;
-    const hdr = ["ID", "First Name", "Last Name", "Email", "Phone", "Loan Amount", "Status", "Revenue", "Response Time", "Source", "Created"];
-    const rows = leads.map(l => [l.id, l.first_name, l.last_name, l.email, l.phone, l.loan_amount, l.status, l.revenue || 0, l.response_time_ms || "", l.source, l.created_at]);
+    const hdr = ["ID", "First Name", "Last Name", "Email", "Phone", "Loan Amount", "Status", "Redirected", "Revenue", "Response Time", "Source", "Created"];
+    const rows = leads.map(l => [l.id, l.first_name, l.last_name, l.email, l.phone, l.loan_amount, l.status, l.redirect_url ? "Yes" : l.status === "rejected_by_lender" ? "No" : "Pending", l.revenue || 0, l.response_time_ms || "", l.source, l.created_at]);
     const csv = [hdr, ...rows].map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   };
@@ -262,10 +264,10 @@ function LeadsPage() {
       <Crd>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{["ID", "Created", "Name", "Email", "Phone", "Amount", "Purpose", "Status", "Commission", "Response", "Source"].map(h => (<th key={h} style={{ padding: "11px 14px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
+            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{["ID", "Created", "Name", "Email", "Phone", "Amount", "Purpose", "Status", "Redirect", "Commission", "Response", "Source"].map(h => (<th key={h} style={{ padding: "11px 14px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={11} style={{ textAlign: "center", padding: 48 }}><Spin /></td></tr> :
-               leads.length === 0 ? <tr><td colSpan={11}><Empty icon="📭" title="No leads found" sub="Adjust filters or wait for new leads" /></td></tr> :
+              {loading ? <tr><td colSpan={12} style={{ textAlign: "center", padding: 48 }}><Spin /></td></tr> :
+               leads.length === 0 ? <tr><td colSpan={12}><Empty icon="📭" title="No leads found" sub="Adjust filters or wait for new leads" /></td></tr> :
                leads.map(l => (
                 <tr key={l.id} onClick={() => openDetail(l)} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer", transition: "background .1s" }} onMouseEnter={e => e.currentTarget.style.background = C.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>#{l.id}</td>
@@ -276,6 +278,7 @@ function LeadsPage() {
                   <td style={{ padding: "9px 14px", fontWeight: 700, color: C.gold, fontVariantNumeric: "tabular-nums" }}>{fm.eur(l.loan_amount)}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11.5 }}>{l.loan_purpose || "—"}</td>
                   <td style={{ padding: "9px 14px" }}><Badge status={l.status} /></td>
+                  <td style={{ padding: "9px 14px", textAlign: "center" }}>{l.redirect_url ? <span style={{ color: C.mint, fontWeight: 800, fontSize: 13 }}>✓</span> : l.status === "rejected_by_lender" ? <span style={{ color: C.red, fontWeight: 800, fontSize: 13 }}>✕</span> : <span style={{ color: C.textGhost }}>—</span>}</td>
                   <td style={{ padding: "9px 14px", fontWeight: 800, color: parseFloat(l.revenue) > 0 ? C.mint : C.textGhost, fontVariantNumeric: "tabular-nums" }}>{parseFloat(l.revenue) > 0 ? fm.eur(l.revenue) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: l.response_time_ms ? C.cyan : C.textGhost, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontSize: 11.5 }}>{l.response_time_ms ? fm.ms(l.response_time_ms) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11 }}>{l.source}</td>
@@ -297,10 +300,11 @@ function LeadsPage() {
             </div>
 
             {/* FiestaCredito Details */}
-            {(detail.lead.fiesta_lead_id || detail.lead.redirect_url || detail.lead.response_time_ms || detail.lead.rejection_reason || parseFloat(detail.lead.revenue) > 0 || detail.lead.distributed_at) && (
+            {(detail.lead.fiesta_lead_id || detail.lead.redirect_url || detail.lead.response_time_ms || detail.lead.rejection_reason || parseFloat(detail.lead.revenue) > 0 || detail.lead.distributed_at || detail.lead.status === "rejected_by_lender" || detail.lead.status === "distributed") && (
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>FiestaCredito Details</div>
                 <div style={{ padding: "14px 16px", background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect Status</div><div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: detail.lead.redirect_url ? C.mint : detail.lead.status === "rejected_by_lender" ? C.red : C.gold }}>{detail.lead.redirect_url ? "✓ Redirected" : detail.lead.status === "rejected_by_lender" ? "✕ Rejected" : "⏳ Pending"}</div></div>
                   {detail.lead.fiesta_lead_id && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Fiesta Lead ID</div><div style={{ fontSize: 12, color: C.text, marginTop: 2, fontFamily: "monospace" }}>{detail.lead.fiesta_lead_id}</div></div>)}
                   {detail.lead.response_time_ms != null && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Response Time</div><div style={{ fontSize: 14, color: C.cyan, fontWeight: 800, marginTop: 2 }}>{fm.ms(detail.lead.response_time_ms)} <span style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>({fm.msRaw(detail.lead.response_time_ms)})</span></div></div>)}
                   {detail.lead.distributed_at && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Distributed At</div><div style={{ fontSize: 12, color: C.text, marginTop: 2 }}>{fm.dt(detail.lead.distributed_at)}</div></div>)}
@@ -551,14 +555,19 @@ const FUNNEL_STEPS = [
 
 function FunnelPage() {
   const [data, setData] = useState(null);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const d = await apiFetch(`/analytics/funnel?days=${days}`);
+      const [d, s] = await Promise.all([
+        apiFetch(`/analytics/funnel?days=${days}`),
+        apiFetch("/analytics/summary").catch(() => null),
+      ]);
       setData(d);
+      setSummary(s?.stats || null);
     } catch (e) { console.error("Funnel load error:", e); }
     setLoading(false);
   }, [days]);
@@ -601,12 +610,49 @@ function FunnelPage() {
       </div>
 
       {/* Summary stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14 }}>
         <Stat label="Unique Visitors" value={fm.num(totalSessions)} icon="👁" color={C.sky} />
         <Stat label="Form Started" value={fm.num(step1)} sub={`${simulatorToForm}% of visitors`} icon="✏️" color={C.gold} />
         <Stat label="Submissions" value={fm.num(completions)} icon="✓" color={C.mint} />
-        <Stat label="Conversion Rate" value={`${conversionRate}%`} sub="Visitor → Submit" icon="⚡" color={conversionRate >= 5 ? C.mint : conversionRate >= 2 ? C.gold : C.red} />
+        <Stat label="Funnel Rate" value={`${conversionRate}%`} sub="Visitor → Submit" icon="⚡" color={conversionRate >= 5 ? C.mint : conversionRate >= 2 ? C.gold : C.red} />
+        <Stat label="Redirect Rate" value={summary?.submittedToLender > 0 ? fm.pct(summary.redirectedLeads / summary.submittedToLender) : "—"} sub={`${fm.num(summary?.redirectedLeads || 0)} of ${fm.num(summary?.submittedToLender || 0)} accepted`} icon="↗" color={summary?.submittedToLender > 0 ? (summary.redirectedLeads / summary.submittedToLender >= 0.9 ? C.mint : summary.redirectedLeads / summary.submittedToLender >= 0.7 ? C.gold : C.red) : C.textDim} />
       </div>
+
+      {/* Post-submission pipeline */}
+      {summary?.submittedToLender > 0 && (
+        <Crd style={{ padding: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 4 }}>Post-Submission Pipeline</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 18 }}>What happens after a lead is submitted to lender</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+            {[
+              { label: "Submitted", value: summary.submittedToLender, color: C.sky },
+              { label: "Redirected", value: summary.redirectedLeads, color: C.mint },
+              { label: "Rejected", value: summary.submittedToLender - summary.redirectedLeads, color: C.red },
+            ].map((stage, i) => (
+              <div key={stage.label} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : 0 }}>
+                <div style={{ textAlign: "center", minWidth: 100 }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: stage.color, lineHeight: 1 }}>{stage.value}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.textSoft, marginTop: 4 }}>{stage.label}</div>
+                  {i === 0 && summary.submittedToLender > 0 && (
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>100%</div>
+                  )}
+                  {i === 1 && summary.submittedToLender > 0 && (
+                    <div style={{ fontSize: 10, color: C.mint, marginTop: 2 }}>{fm.pct(summary.redirectedLeads / summary.submittedToLender)}</div>
+                  )}
+                  {i === 2 && summary.submittedToLender > 0 && (
+                    <div style={{ fontSize: 10, color: C.red, marginTop: 2 }}>{fm.pct((summary.submittedToLender - summary.redirectedLeads) / summary.submittedToLender)}</div>
+                  )}
+                </div>
+                {i < 2 && (
+                  <div style={{ flex: 1, height: 2, background: C.border, margin: "0 12px", position: "relative" }}>
+                    <div style={{ position: "absolute", right: -4, top: -4, fontSize: 10, color: C.textGhost }}>→</div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Crd>
+      )}
 
       {/* Visual funnel */}
       <Crd style={{ padding: 24 }}>
