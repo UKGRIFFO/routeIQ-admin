@@ -474,7 +474,7 @@ function LeadsPage({ dateRange }) {
         {detailLoading ? <div style={{ textAlign: "center", padding: 44 }}><Spin sz={26} /></div> : detail?.lead ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              {[["Email", detail.lead.email], ["Phone", detail.lead.phone], ["Loan Amount", fm.eur(detail.lead.loan_amount)], ["Loan Purpose", detail.lead.loan_purpose], ["Loan Period", detail.lead.loan_period ? `${detail.lead.loan_period} days` : null], ["Credit Score", detail.lead.credit_score], ["Employment", detail.lead.employment_status], ["Annual Income", fm.eur(detail.lead.annual_income)], ["Company", detail.lead.company_name], ["Housing", detail.lead.housing_tenure], ["Dependents", detail.lead.number_of_dependants], ["Country", detail.lead.country], ["Source", detail.lead.source], ["Status", null, <Badge key="b" status={detail.lead.status} />], ["Created", fm.dt(detail.lead.created_at)], ["IP", detail.lead.ip_address]].map(([k, v, node]) => (
+              {[["Email", detail.lead.email], ["Phone", detail.lead.phone], ["Loan Amount", fm.eur(detail.lead.loan_amount)], ["Loan Purpose", detail.lead.loan_purpose], ["Loan Period", detail.lead.loan_period ? `${detail.lead.loan_period} days` : null], ["Credit Score", detail.lead.credit_score], ["Employment", detail.lead.employment_status], ["Annual Income", fm.eur(detail.lead.annual_income)], ["Company", detail.lead.company_name], ["Housing", detail.lead.housing_status], ["Dependents", detail.lead.dependents], ["Country", detail.lead.country], ["Source", detail.lead.source], ["Status", null, <Badge key="b" status={detail.lead.status} />], ["Created", fm.dt(detail.lead.created_at)], ["IP", detail.lead.ip_address]].map(([k, v, node]) => (
                 <div key={k}><div style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>{k}</div>{node || <div style={{ fontSize: 13, color: v ? C.text : C.textDim }}>{v || "—"}</div>}</div>
               ))}
             </div>
@@ -675,7 +675,7 @@ function AnalyticsPage({ dateRange }) {
           <Stat label="Rejected" value={fm.num(t.rej)} color={C.red} tip="Leads rejected by lender (not meeting criteria)" />
         </div>
         <Crd style={{ padding: "18px 20px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 14 }}>Trend — {days} Days</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 14 }}>Trend — {dateRange.label}</div>
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={daily}>
               <defs><linearGradient id="a1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.sky} stopOpacity={.2} /><stop offset="100%" stopColor={C.sky} stopOpacity={0} /></linearGradient><linearGradient id="a2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.mint} stopOpacity={.2} /><stop offset="100%" stopColor={C.mint} stopOpacity={0} /></linearGradient></defs>
