@@ -488,6 +488,7 @@ function LeadsPage({ dateRange }) {
             mudanza: "Moving", impuestos: "Taxes", deudas: "Debts", inversion: "Investment",
             formacion: "Training", ocio: "Leisure", mascotas: "Pets", viaje: "Travel",
             compras: "Shopping", hogar: "Home", familia: "Family", emergencia: "Emergency",
+            refinanciacion: "Refinancing",
           };
           // Humanize: "not_married" → "Not Married", "living_with_parents" → "Living With Parents"
           const humanize = (s) => {
@@ -510,7 +511,12 @@ function LeadsPage({ dateRange }) {
 
           const sinceLabel = (val, brackets) => {
             if (!val) return null;
-            const str = String(val).trim();
+            const str = String(val).trim().toLowerCase();
+            // Map form values to card labels
+            const addressMap = { less_one: "< 1 year", less_1: "< 1 year", one_three: "1–3 years", "1_3": "1–3 years", more_three: "3+ years", more_3: "3+ years" };
+            const jobMap = { less_six: "< 6 months", less_6: "< 6 months", six_twelve: "6–12 months", "6_12": "6–12 months", more_twelve: "12+ months", more_12: "12+ months" };
+            if (brackets === 'address' && addressMap[str]) return addressMap[str];
+            if (brackets === 'job' && jobMap[str]) return jobMap[str];
             // Try parsing as date
             const d = new Date(str.replace(/ /g, '-'));
             if (!isNaN(d) && d.getFullYear() > 1900) {
@@ -526,7 +532,6 @@ function LeadsPage({ dateRange }) {
                 if (totalMonths < 12) return "6–12 months";
                 return "12+ months";
               }
-              return humanize(str);
             }
             return humanize(str);
           };
