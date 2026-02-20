@@ -484,8 +484,13 @@ function LeadsPage({ dateRange }) {
             material_electronico: "Electronics", gasto_medico: "Medical Expense",
             reparaciones: "Repairs", otro: "Other", other: "Other",
           };
+          // Humanize: "not_married" → "Not Married", "living_with_parents" → "Living With Parents"
+          const humanize = (s) => {
+            if (!s || typeof s !== "string") return s;
+            return s.replace(/[_-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          };
           const purposeEn = L.loan_purpose ? purposeMap[L.loan_purpose] || null : null;
-          const purposeDisplay = L.loan_purpose ? (purposeEn ? `${L.loan_purpose} / ${purposeEn}` : L.loan_purpose) : null;
+          const purposeDisplay = L.loan_purpose ? (purposeEn ? `${humanize(L.loan_purpose)} / ${purposeEn}` : humanize(L.loan_purpose)) : null;
 
           const calcAge = (dob) => {
             if (!dob) return null;
@@ -498,10 +503,17 @@ function LeadsPage({ dateRange }) {
           };
           const age = calcAge(L.date_of_birth);
 
+          const fmtDOB = (dob) => {
+            if (!dob) return null;
+            const d = new Date(dob);
+            if (isNaN(d)) return dob;
+            return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+          };
+
           const addressLine = [L.street, L.house_number, L.flat_number ? `Flat ${L.flat_number}` : null].filter(Boolean).join(", ") || null;
           const locationLine = [L.postal_code, L.city, L.province].filter(Boolean).join(", ") || null;
 
-          const dailyRate = L.loan_amount && L.loan_period ? `${fm.eur(L.loan_amount)} / ${L.loan_period}d` : null;
+          const yrsLabel = (n) => n != null ? `${n} year${n === 1 ? "" : "s"}` : null;
 
           const F = ({ label, value }) => (
             <div style={{ marginBottom: 8 }}>
@@ -525,11 +537,13 @@ function LeadsPage({ dateRange }) {
 
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Header */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 16, fontWeight: 900, color: C.text }}>Lead #{L.id} — {L.first_name} {L.last_name}{L.second_last_name ? ` ${L.second_last_name}` : ""}</span>
-                {age && <span style={{ fontSize: 13, color: C.textSoft, fontWeight: 600 }}>· {age}yrs</span>}
-                {L.gender && <span style={{ fontSize: 13, color: C.textSoft, fontWeight: 600 }}>· {L.gender}</span>}
+              {/* Header — badge right-aligned */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: C.text }}>Lead #{L.id} — {L.first_name} {L.last_name}{L.second_last_name ? ` ${L.second_last_name}` : ""}</span>
+                  {age && <span style={{ fontSize: 13, color: C.textSoft, fontWeight: 600 }}>· {age}yrs</span>}
+                  {L.gender && <span style={{ fontSize: 13, color: C.textSoft, fontWeight: 600 }}>· {humanize(L.gender)}</span>}
+                </div>
                 <Badge status={L.status} />
               </div>
 
@@ -542,20 +556,24 @@ function LeadsPage({ dateRange }) {
                   <F label="Created" value={fm.dt(L.created_at)} />
                 </CardSection>
 
-                {/* Decision Snapshot */}
-                <CardSection title="Decision Snapshot" icon="⚡">
+                {/* Decision Snapshot — S.A.W. */}
+                <CardSection title="Decision Snapshot (S.A.W.)" icon="⚡">
+                  <div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Stability</div>
+                  <F label="Years at Address" value={yrsLabel(L.years_at_address)} />
+                  <F label="Years at Job" value={yrsLabel(L.years_at_job)} />
+                  <F label="Years at Bank" value={yrsLabel(L.years_at_bank)} />
+                  <div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6, marginTop: 4 }}>Ability</div>
                   <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
-                  <F label="Term" value={L.loan_period ? `${L.loan_period} days` : null} />
-                  <F label="Purpose" value={purposeDisplay} />
-                  <F label="Ratio" value={dailyRate} />
+                  <div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6, marginTop: 4 }}>Willingness</div>
+                  <F label="Credit Score" value={L.credit_score ? String(L.credit_score) : null} />
                 </CardSection>
 
                 {/* Personal */}
                 <CardSection title="Personal" icon="👤">
-                  <F label="Marital Status" value={L.marital_status} />
-                  <F label="Housing" value={L.housing_tenure} />
+                  <F label="Marital Status" value={humanize(L.marital_status)} />
+                  <F label="Housing" value={humanize(L.housing_tenure)} />
                   <F label="Dependents" value={L.dependents != null ? String(L.dependents) : null} />
-                  <F label="Education" value={L.education} />
+                  <F label="Education" value={humanize(L.education)} />
                 </CardSection>
 
                 {/* Address */}
@@ -567,8 +585,8 @@ function LeadsPage({ dateRange }) {
 
                 {/* Income & Employment */}
                 <CardSection title="Income & Employment" icon="💼">
-                  <F label="Employment" value={L.income_source} />
-                  <F label="Job Level" value={L.job_level} />
+                  <F label="Employment" value={humanize(L.income_source)} />
+                  <F label="Job Level" value={humanize(L.job_level)} />
                   <F label="Company" value={L.company_name} />
                   <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
                 </CardSection>
@@ -583,8 +601,8 @@ function LeadsPage({ dateRange }) {
                 {/* Identity — collapsed by default */}
                 <CardSection title="Identity" icon="🪪" collapsible collapsed={collapsed.identity} onToggle={() => setCollapsed(c => ({ ...c, identity: !c.identity }))}>
                   <F label="DNI" value={L.personal_code} />
-                  <F label="Gender" value={L.gender} />
-                  <F label="Date of Birth" value={L.date_of_birth} />
+                  <F label="Gender" value={humanize(L.gender)} />
+                  <F label="Date of Birth" value={fmtDOB(L.date_of_birth)} />
                 </CardSection>
               </div>
 
