@@ -475,11 +475,68 @@ function LeadsPage({ dateRange }) {
       <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); }} title={selected ? `Lead #${selected.id} — ${selected.first_name} ${selected.last_name}` : ""} w={700}>
         {detailLoading ? <div style={{ textAlign: "center", padding: 44 }}><Spin sz={26} /></div> : detail?.lead ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              {[["Email", detail.lead.email], ["Phone", detail.lead.phone], ["Loan Amount", fm.eur(detail.lead.loan_amount)], ["Loan Purpose", detail.lead.loan_purpose], ["Loan Period", detail.lead.loan_period ? `${detail.lead.loan_period} days` : null], ["Credit Score", detail.lead.credit_score], ["Employment", detail.lead.employment_status], ["Annual Income", fm.eur(detail.lead.annual_income)], ["Company", detail.lead.company_name], ["Housing", detail.lead.housing_status], ["Dependents", detail.lead.dependents], ["Country", detail.lead.country], ["Source", detail.lead.source], ["Status", null, <Badge key="b" status={detail.lead.status} />], ["Created", fm.dt(detail.lead.created_at)], ["IP", detail.lead.ip_address]].map(([k, v, node]) => (
-                <div key={k}><div style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>{k}</div>{node || <div style={{ fontSize: 13, color: v ? C.text : C.textDim }}>{v || "—"}</div>}</div>
-              ))}
-            </div>
+            {(() => {
+              const L = detail.lead;
+              const purposeMap = {
+                gasto_imprevisto: "Unexpected Expense", consolidacion_deudas: "Debt Consolidation",
+                reforma_hogar: "Home Renovation", vehiculo: "Vehicle", vacaciones: "Holidays",
+                salud: "Health", educacion: "Education", negocio: "Business", boda: "Wedding",
+                negocio_propio: "Own Business", pago_servicios: "Service Payment",
+                material_electronico: "Electronics", gasto_medico: "Medical Expense",
+                reparaciones: "Repairs", otro: "Other", other: "Other",
+              };
+              const purposeEn = L.loan_purpose ? purposeMap[L.loan_purpose] || null : null;
+              const purposeDisplay = L.loan_purpose ? (purposeEn ? `${L.loan_purpose} / ${purposeEn}` : L.loan_purpose) : null;
+
+              const calcAge = (dob) => {
+                if (!dob) return null;
+                const birth = new Date(dob);
+                if (isNaN(birth)) return null;
+                const now = new Date();
+                let age = now.getFullYear() - birth.getFullYear();
+                if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+                return age > 0 && age < 120 ? age : null;
+              };
+              const age = calcAge(L.date_of_birth);
+
+              const address = [L.street, L.house_number, L.flat_number ? `Flat ${L.flat_number}` : null].filter(Boolean).join(", ") || null;
+              const location = [L.city, L.province, L.postal_code].filter(Boolean).join(", ") || null;
+
+              const fields = [
+                ["Email", L.email],
+                ["Phone", L.phone],
+                ["Age", age ? `${age} years` : null],
+                ["Gender", L.gender],
+                ["DNI", L.personal_code],
+                ["Marital Status", L.marital_status],
+                ["Loan Amount", fm.eur(L.loan_amount)],
+                ["Loan Purpose", purposeDisplay],
+                ["Loan Period", L.loan_period ? `${L.loan_period} days` : null],
+                ["Employment", L.income_source],
+                ["Job Level", L.job_level],
+                ["Company", L.company_name],
+                ["Monthly Income", L.monthly_income ? fm.eur(L.monthly_income) : null],
+                ["Education", L.education],
+                ["Housing", L.housing_tenure],
+                ["Dependents", L.dependents != null ? String(L.dependents) : null],
+                ["Address", address],
+                ["Location", location],
+                ["Country", L.country],
+                ["Marketing", L.marketing_consent === true ? "✓ Accepted" : L.marketing_consent === false ? "✕ Declined" : null],
+                ["Source", L.source],
+                ["Status", null, <Badge key="b" status={L.status} />],
+                ["Created", fm.dt(L.created_at)],
+                ["IP", L.ip_address],
+              ];
+
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  {fields.map(([k, v, node]) => (
+                    <div key={k}><div style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>{k}</div>{node || <div style={{ fontSize: 13, color: v ? C.text : C.textDim }}>{v || "—"}</div>}</div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* FiestaCredito Details */}
             {(detail.lead.fiesta_lead_id || detail.lead.redirect_url || detail.lead.response_time_ms || detail.lead.rejection_reason || parseFloat(detail.lead.revenue) > 0 || detail.lead.distributed_at || detail.lead.status === "rejected_by_lender" || detail.lead.status === "distributed") && (
