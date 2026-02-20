@@ -579,7 +579,7 @@ function LenderForm({ open, lender, onClose, onSaved }) {
     <Modal open={open} onClose={onClose} title={isEdit ? `Edit ${lender?.name}` : "Add Buyer"} w={620}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Inp label="Lender Name" value={form.name || ""} onChange={e => up("name", e.target.value)} placeholder="e.g. FiestaCredito" />
+          <Inp label="Buyer Name" value={form.name || ""} onChange={e => up("name", e.target.value)} placeholder="e.g. FiestaCredito" />
           <Sel label="Auth Type" value={form.auth_type || "bearer"} onChange={e => up("auth_type", e.target.value)} options={[{ v: "bearer", l: "Bearer Token" }, { v: "basic", l: "Basic Auth" }, { v: "header", l: "Custom Header" }, { v: "none", l: "None" }]} />
         </div>
         <Inp label="API Endpoint" value={form.api_endpoint || ""} onChange={e => up("api_endpoint", e.target.value)} placeholder="https://api.lender.com/leads" />
