@@ -397,6 +397,7 @@ function LeadsPage({ dateRange }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [collapsed, setCollapsed] = useState({ identity: true, system: true });
   const intervalRef = useRef(null);
 
   const load = useCallback((silent = false) => {
@@ -417,7 +418,7 @@ function LeadsPage({ dateRange }) {
     return () => clearInterval(intervalRef.current);
   }, [load]);
 
-  const openDetail = l => { setSelected(l); setDetailLoading(true); apiFetch(`/leads/${l.id}`).then(d => setDetail(d)).catch(() => setDetail(null)).finally(() => setDetailLoading(false)); };
+  const openDetail = l => { setSelected(l); setDetailLoading(true); setCollapsed({ identity: true, system: true }); apiFetch(`/leads/${l.id}`).then(d => setDetail(d)).catch(() => setDetail(null)).finally(() => setDetailLoading(false)); };
 
   const exportCSV = () => {
     if (!leads.length) return;
@@ -472,131 +473,191 @@ function LeadsPage({ dateRange }) {
         {pg.totalPages > 1 && (<div style={{ display: "flex", justifyContent: "center", gap: 10, padding: 14, borderTop: `1px solid ${C.border}` }}><Btn sz="sm" v="ghost" disabled={filters.page <= 1} onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}>← Prev</Btn><span style={{ fontSize: 11.5, color: C.textDim, alignSelf: "center" }}>{pg.page} / {pg.totalPages}</span><Btn sz="sm" v="ghost" disabled={filters.page >= pg.totalPages} onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))}>Next →</Btn></div>)}
       </Crd>
 
-      <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); }} title={selected ? `Lead #${selected.id} — ${selected.first_name} ${selected.last_name}` : ""} w={700}>
-        {detailLoading ? <div style={{ textAlign: "center", padding: 44 }}><Spin sz={26} /></div> : detail?.lead ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {(() => {
-              const L = detail.lead;
-              const purposeMap = {
-                gasto_imprevisto: "Unexpected Expense", consolidacion_deudas: "Debt Consolidation",
-                reforma_hogar: "Home Renovation", vehiculo: "Vehicle", vacaciones: "Holidays",
-                salud: "Health", educacion: "Education", negocio: "Business", boda: "Wedding",
-                negocio_propio: "Own Business", pago_servicios: "Service Payment",
-                material_electronico: "Electronics", gasto_medico: "Medical Expense",
-                reparaciones: "Repairs", otro: "Other", other: "Other",
-              };
-              const purposeEn = L.loan_purpose ? purposeMap[L.loan_purpose] || null : null;
-              const purposeDisplay = L.loan_purpose ? (purposeEn ? `${L.loan_purpose} / ${purposeEn}` : L.loan_purpose) : null;
+      <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); setCollapsed({ identity: true, system: true }); }} title="" w={720}>
+        {detailLoading ? <div style={{ textAlign: "center", padding: 44 }}><Spin sz={26} /></div> : detail?.lead ? (() => {
+          const L = detail.lead;
+          const purposeMap = {
+            gasto_imprevisto: "Unexpected Expense", consolidacion_deudas: "Debt Consolidation",
+            reforma_hogar: "Home Renovation", vehiculo: "Vehicle", vacaciones: "Holidays",
+            salud: "Health", educacion: "Education", negocio: "Business", boda: "Wedding",
+            negocio_propio: "Own Business", pago_servicios: "Service Payment",
+            material_electronico: "Electronics", gasto_medico: "Medical Expense",
+            reparaciones: "Repairs", otro: "Other", other: "Other",
+          };
+          const purposeEn = L.loan_purpose ? purposeMap[L.loan_purpose] || null : null;
+          const purposeDisplay = L.loan_purpose ? (purposeEn ? `${L.loan_purpose} / ${purposeEn}` : L.loan_purpose) : null;
 
-              const calcAge = (dob) => {
-                if (!dob) return null;
-                const birth = new Date(dob);
-                if (isNaN(birth)) return null;
-                const now = new Date();
-                let age = now.getFullYear() - birth.getFullYear();
-                if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
-                return age > 0 && age < 120 ? age : null;
-              };
-              const age = calcAge(L.date_of_birth);
+          const calcAge = (dob) => {
+            if (!dob) return null;
+            const birth = new Date(dob);
+            if (isNaN(birth)) return null;
+            const now = new Date();
+            let age = now.getFullYear() - birth.getFullYear();
+            if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+            return age > 0 && age < 120 ? age : null;
+          };
+          const age = calcAge(L.date_of_birth);
 
-              const address = [L.street, L.house_number, L.flat_number ? `Flat ${L.flat_number}` : null].filter(Boolean).join(", ") || null;
-              const location = [L.city, L.province, L.postal_code].filter(Boolean).join(", ") || null;
+          const addressLine = [L.street, L.house_number, L.flat_number ? `Flat ${L.flat_number}` : null].filter(Boolean).join(", ") || null;
+          const locationLine = [L.postal_code, L.city, L.province].filter(Boolean).join(", ") || null;
 
-              const fields = [
-                ["Email", L.email],
-                ["Phone", L.phone],
-                ["Age", age ? `${age} years` : null],
-                ["Gender", L.gender],
-                ["DNI", L.personal_code],
-                ["Marital Status", L.marital_status],
-                ["Loan Amount", fm.eur(L.loan_amount)],
-                ["Loan Purpose", purposeDisplay],
-                ["Loan Period", L.loan_period ? `${L.loan_period} days` : null],
-                ["Employment", L.income_source],
-                ["Job Level", L.job_level],
-                ["Company", L.company_name],
-                ["Monthly Income", L.monthly_income ? fm.eur(L.monthly_income) : null],
-                ["Education", L.education],
-                ["Housing", L.housing_tenure],
-                ["Dependents", L.dependents != null ? String(L.dependents) : null],
-                ["Address", address],
-                ["Location", location],
-                ["Country", L.country],
-                ["Marketing", L.marketing_consent === true ? "✓ Accepted" : L.marketing_consent === false ? "✕ Declined" : null],
-                ["Source", L.source],
-                ["Status", null, <Badge key="b" status={L.status} />],
-                ["Created", fm.dt(L.created_at)],
-                ["IP", L.ip_address],
-              ];
+          const dailyRate = L.loan_amount && L.loan_period ? `${fm.eur(L.loan_amount)} / ${L.loan_period}d` : null;
 
-              return (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  {fields.map(([k, v, node]) => (
-                    <div key={k}><div style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>{k}</div>{node || <div style={{ fontSize: 13, color: v ? C.text : C.textDim }}>{v || "—"}</div>}</div>
+          const F = ({ label, value }) => (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 13, color: value ? C.text : C.textDim }}>{value || "—"}</div>
+            </div>
+          );
+
+          const CardSection = ({ title, icon, children, collapsible, collapsed: isCollapsed, onToggle }) => (
+            <div style={{ background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+              <div onClick={collapsible ? onToggle : undefined} style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: collapsible ? "pointer" : "default", borderBottom: isCollapsed ? "none" : `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ fontSize: 13, opacity: .5 }}>{icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: ".06em" }}>{title}</span>
+                </div>
+                {collapsible && <span style={{ fontSize: 10, color: C.textGhost, transition: "transform .2s", transform: isCollapsed ? "rotate(0deg)" : "rotate(180deg)" }}>▼</span>}
+              </div>
+              {!isCollapsed && <div style={{ padding: "12px 14px" }}>{children}</div>}
+            </div>
+          );
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: C.text }}>Lead #{L.id} — {L.first_name} {L.last_name}{L.second_last_name ? ` ${L.second_last_name}` : ""}</span>
+                {age && <span style={{ fontSize: 13, color: C.textSoft, fontWeight: 600 }}>· {age}yrs</span>}
+                {L.gender && <span style={{ fontSize: 13, color: C.textSoft, fontWeight: 600 }}>· {L.gender}</span>}
+                <Badge status={L.status} />
+              </div>
+
+              {/* Cards grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {/* Contact */}
+                <CardSection title="Contact" icon="📞">
+                  <F label="Phone" value={L.phone} />
+                  <F label="Email" value={L.email} />
+                  <F label="Created" value={fm.dt(L.created_at)} />
+                </CardSection>
+
+                {/* Decision Snapshot */}
+                <CardSection title="Decision Snapshot" icon="⚡">
+                  <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
+                  <F label="Term" value={L.loan_period ? `${L.loan_period} days` : null} />
+                  <F label="Purpose" value={purposeDisplay} />
+                  <F label="Ratio" value={dailyRate} />
+                </CardSection>
+
+                {/* Personal */}
+                <CardSection title="Personal" icon="👤">
+                  <F label="Marital Status" value={L.marital_status} />
+                  <F label="Housing" value={L.housing_tenure} />
+                  <F label="Dependents" value={L.dependents != null ? String(L.dependents) : null} />
+                  <F label="Education" value={L.education} />
+                </CardSection>
+
+                {/* Address */}
+                <CardSection title="Address" icon="📍">
+                  <F label="Street" value={addressLine} />
+                  <F label="Location" value={locationLine} />
+                  <F label="Country" value={L.country} />
+                </CardSection>
+
+                {/* Income & Employment */}
+                <CardSection title="Income & Employment" icon="💼">
+                  <F label="Employment" value={L.income_source} />
+                  <F label="Job Level" value={L.job_level} />
+                  <F label="Company" value={L.company_name} />
+                  <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
+                </CardSection>
+
+                {/* Loan Request */}
+                <CardSection title="Loan Request" icon="💰">
+                  <F label="Amount" value={fm.eur(L.loan_amount)} />
+                  <F label="Period" value={L.loan_period ? `${L.loan_period} days` : null} />
+                  <F label="Purpose" value={purposeDisplay} />
+                </CardSection>
+
+                {/* Identity — collapsed by default */}
+                <CardSection title="Identity" icon="🪪" collapsible collapsed={collapsed.identity} onToggle={() => setCollapsed(c => ({ ...c, identity: !c.identity }))}>
+                  <F label="DNI" value={L.personal_code} />
+                  <F label="Gender" value={L.gender} />
+                  <F label="Date of Birth" value={L.date_of_birth} />
+                </CardSection>
+              </div>
+
+              {/* System card — full width, collapsed */}
+              <CardSection title="System" icon="⚙" collapsible collapsed={collapsed.system} onToggle={() => setCollapsed(c => ({ ...c, system: !c.system }))}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                  <F label="Lead ID" value={String(L.id)} />
+                  <F label="Source" value={L.source} />
+                  <F label="Marketing" value={L.marketing_consent === true ? "✓ Accepted" : L.marketing_consent === false ? "✕ Declined" : null} />
+                  <F label="IP" value={L.ip_address} />
+                </div>
+              </CardSection>
+
+              {/* FiestaCredito Details */}
+              {(L.fiesta_lead_id || L.redirect_url || L.response_time_ms || L.rejection_reason || parseFloat(L.revenue) > 0 || L.distributed_at || L.status === "rejected_by_lender" || L.status === "distributed") && (
+                <div style={{ background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 12, textTransform: "uppercase", letterSpacing: ".06em" }}>FiestaCredito Details</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect Status</div><div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: L.status === 'redirected' || L.status === 'accepted' || L.status === 'sold' || L.status === 'converted' || L.status === 'completed' ? C.mint : L.redirect_url ? C.gold : L.status === "rejected_by_lender" ? C.red : C.gold }}>{L.status === 'redirected' || L.status === 'accepted' || L.status === 'sold' || L.status === 'converted' || L.status === 'completed' ? "✓✓ Confirmed Redirected" : L.redirect_url ? "✓ Accepted (not confirmed)" : L.status === "rejected_by_lender" ? "✕ Rejected" : "⏳ Pending"}</div></div>
+                    {L.fiesta_lead_id && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Fiesta Lead ID</div><div style={{ fontSize: 12, color: C.text, marginTop: 2, fontFamily: "monospace" }}>{L.fiesta_lead_id}</div></div>)}
+                    {L.response_time_ms != null && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Response Time</div><div style={{ fontSize: 14, color: C.cyan, fontWeight: 800, marginTop: 2 }}>{fm.ms(L.response_time_ms)} <span style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>({fm.msRaw(L.response_time_ms)})</span></div></div>)}
+                    {L.distributed_at && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Distributed At</div><div style={{ fontSize: 12, color: C.text, marginTop: 2 }}>{fm.dt(L.distributed_at)}</div></div>)}
+                    {parseFloat(L.revenue) > 0 && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Revenue</div><div style={{ fontSize: 14, color: C.gold, fontWeight: 800, marginTop: 2 }}>{fm.eur(L.revenue)}</div></div>)}
+                    {L.redirect_url && (<div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect URL</div><div style={{ fontSize: 11, color: C.sky, marginTop: 2, wordBreak: "break-all", fontFamily: "monospace" }}>{L.redirect_url}</div></div>)}
+                    {L.rejection_reason && (<div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Rejection Reason</div><div style={{ fontSize: 12, color: C.red, marginTop: 2 }}>{L.rejection_reason}</div></div>)}
+                  </div>
+                </div>
+              )}
+
+              {/* Postback Events */}
+              {detail.postbacks?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Postback Events</div>
+                  {detail.postbacks.map((pb, i) => (
+                    <div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{pb.event}</div>
+                        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{fm.dt(pb.created_at)} · Event ID: {pb.event_id || "—"}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        {parseFloat(pb.payout) > 0 && <div style={{ fontSize: 14, fontWeight: 800, color: C.gold }}>{fm.eur(pb.payout)}</div>}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              );
-            })()}
+              )}
 
-            {/* FiestaCredito Details */}
-            {(detail.lead.fiesta_lead_id || detail.lead.redirect_url || detail.lead.response_time_ms || detail.lead.rejection_reason || parseFloat(detail.lead.revenue) > 0 || detail.lead.distributed_at || detail.lead.status === "rejected_by_lender" || detail.lead.status === "distributed") && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>FiestaCredito Details</div>
-                <div style={{ padding: "14px 16px", background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect Status</div><div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: detail.lead.status === 'redirected' || detail.lead.status === 'accepted' || detail.lead.status === 'sold' || detail.lead.status === 'converted' || detail.lead.status === 'completed' ? C.mint : detail.lead.redirect_url ? C.gold : detail.lead.status === "rejected_by_lender" ? C.red : C.gold }}>{detail.lead.status === 'redirected' || detail.lead.status === 'accepted' || detail.lead.status === 'sold' || detail.lead.status === 'converted' || detail.lead.status === 'completed' ? "✓✓ Confirmed Redirected" : detail.lead.redirect_url ? "✓ Accepted (not confirmed)" : detail.lead.status === "rejected_by_lender" ? "✕ Rejected" : "⏳ Pending"}</div></div>
-                  {detail.lead.fiesta_lead_id && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Fiesta Lead ID</div><div style={{ fontSize: 12, color: C.text, marginTop: 2, fontFamily: "monospace" }}>{detail.lead.fiesta_lead_id}</div></div>)}
-                  {detail.lead.response_time_ms != null && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Response Time</div><div style={{ fontSize: 14, color: C.cyan, fontWeight: 800, marginTop: 2 }}>{fm.ms(detail.lead.response_time_ms)} <span style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>({fm.msRaw(detail.lead.response_time_ms)})</span></div></div>)}
-                  {detail.lead.distributed_at && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Distributed At</div><div style={{ fontSize: 12, color: C.text, marginTop: 2 }}>{fm.dt(detail.lead.distributed_at)}</div></div>)}
-                  {parseFloat(detail.lead.revenue) > 0 && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Revenue</div><div style={{ fontSize: 14, color: C.gold, fontWeight: 800, marginTop: 2 }}>{fm.eur(detail.lead.revenue)}</div></div>)}
-                  {detail.lead.redirect_url && (<div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect URL</div><div style={{ fontSize: 11, color: C.sky, marginTop: 2, wordBreak: "break-all", fontFamily: "monospace" }}>{detail.lead.redirect_url}</div></div>)}
-                  {detail.lead.rejection_reason && (<div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Rejection Reason</div><div style={{ fontSize: 12, color: C.red, marginTop: 2 }}>{detail.lead.rejection_reason}</div></div>)}
+              {detail.distributions?.length > 0 && (<div><div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Distribution History</div>{detail.distributions.map((d, i) => (<div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}><div><div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{d.lender_name}</div><div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Sent {fm.dt(d.sent_at)} · {fm.ms(d.response_time_ms)} response</div></div><div style={{ textAlign: "right" }}><Badge status={d.was_purchased ? "sold" : d.response_status === "rejected" ? "rejected" : "distributed"} />{d.sale_price != null && <div style={{ fontSize: 12, fontWeight: 800, color: C.mint, marginTop: 4 }}>{fm.eur(d.sale_price)}</div>}</div></div>))}</div>)}
+
+              {/* Redirect Confirmation Log */}
+              {detail.redirectLogs?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Redirect Confirmation Log</div>
+                  {detail.redirectLogs.map((rl, i) => (
+                    <div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, border: `1px solid ${C.mint}30`, marginBottom: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: C.mint }}>✓✓ Browser confirmed redirect</div>
+                          <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{fm.dt(rl.created_at)}</div>
+                        </div>
+                        <div style={{ textAlign: "right", fontSize: 10.5, color: C.textDim }}>
+                          IP: {rl.ip_address || "—"}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 10.5, color: C.sky, marginTop: 6, wordBreak: "break-all", fontFamily: "monospace" }}>{rl.destination_url}</div>
+                      {rl.user_agent && <div style={{ fontSize: 9.5, color: C.textGhost, marginTop: 4, wordBreak: "break-all" }}>{rl.user_agent}</div>}
+                    </div>
+                  ))}
                 </div>
-              </div>
-            )}
-
-            {/* Postback Events */}
-            {detail.postbacks?.length > 0 && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Postback Events</div>
-                {detail.postbacks.map((pb, i) => (
-                  <div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{pb.event}</div>
-                      <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{fm.dt(pb.created_at)} · Event ID: {pb.event_id || "—"}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      {parseFloat(pb.payout) > 0 && <div style={{ fontSize: 14, fontWeight: 800, color: C.gold }}>{fm.eur(pb.payout)}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {detail.distributions?.length > 0 && (<div><div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Distribution History</div>{detail.distributions.map((d, i) => (<div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}><div><div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{d.lender_name}</div><div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Sent {fm.dt(d.sent_at)} · {fm.ms(d.response_time_ms)} response</div></div><div style={{ textAlign: "right" }}><Badge status={d.was_purchased ? "sold" : d.response_status === "rejected" ? "rejected" : "distributed"} />{d.sale_price != null && <div style={{ fontSize: 12, fontWeight: 800, color: C.mint, marginTop: 4 }}>{fm.eur(d.sale_price)}</div>}</div></div>))}</div>)}
-
-            {/* Redirect Confirmation Log */}
-            {detail.redirectLogs?.length > 0 && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Redirect Confirmation Log</div>
-                {detail.redirectLogs.map((rl, i) => (
-                  <div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, border: `1px solid ${C.mint}30`, marginBottom: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 13, color: C.mint }}>✓✓ Browser confirmed redirect</div>
-                        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{fm.dt(rl.created_at)}</div>
-                      </div>
-                      <div style={{ textAlign: "right", fontSize: 10.5, color: C.textDim }}>
-                        IP: {rl.ip_address || "—"}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 10.5, color: C.sky, marginTop: 6, wordBreak: "break-all", fontFamily: "monospace" }}>{rl.destination_url}</div>
-                    {rl.user_agent && <div style={{ fontSize: 9.5, color: C.textGhost, marginTop: 4, wordBreak: "break-all" }}>{rl.user_agent}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : <Empty icon="⚠️" title="Could not load lead details" />}
+              )}
+            </div>
+          );
+        })() : <Empty icon="⚠️" title="Could not load lead details" />}
       </Modal>
     </div>
   );
