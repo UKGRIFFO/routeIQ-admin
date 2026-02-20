@@ -558,13 +558,9 @@ function LeadsPage({ dateRange }) {
 
                 {/* Decision Snapshot — S.A.W. */}
                 <CardSection title="Decision Snapshot (S.A.W.)" icon="⚡">
-                  <div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Stability</div>
                   <F label="Years at Address" value={yrsLabel(L.years_at_address)} />
                   <F label="Years at Job" value={yrsLabel(L.years_at_job)} />
-                  <F label="Years at Bank" value={yrsLabel(L.years_at_bank)} />
-                  <div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6, marginTop: 4 }}>Ability</div>
                   <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
-                  <div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6, marginTop: 4 }}>Willingness</div>
                   <F label="Credit Score" value={L.credit_score ? String(L.credit_score) : null} />
                 </CardSection>
 
@@ -587,7 +583,7 @@ function LeadsPage({ dateRange }) {
                 <CardSection title="Income & Employment" icon="💼">
                   <F label="Employment" value={humanize(L.income_source)} />
                   <F label="Job Level" value={humanize(L.job_level)} />
-                  <F label="Company" value={L.company_name} />
+                  <F label="Company" value={humanize(L.company_name)} />
                   <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
                 </CardSection>
 
