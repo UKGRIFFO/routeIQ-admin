@@ -483,6 +483,10 @@ function LeadsPage({ dateRange }) {
             negocio_propio: "Own Business", pago_servicios: "Service Payment",
             material_electronico: "Electronics", gasto_medico: "Medical Expense",
             reparaciones: "Repairs", otro: "Other", other: "Other",
+            alimentacion: "Food & Groceries", transporte: "Transport", vivienda: "Housing",
+            mudanza: "Moving", impuestos: "Taxes", deudas: "Debts", inversion: "Investment",
+            formacion: "Training", ocio: "Leisure", mascotas: "Pets", viaje: "Travel",
+            compras: "Shopping", hogar: "Home", familia: "Family", emergencia: "Emergency",
           };
           // Humanize: "not_married" → "Not Married", "living_with_parents" → "Living With Parents"
           const humanize = (s) => {
@@ -512,8 +516,6 @@ function LeadsPage({ dateRange }) {
 
           const addressLine = [L.street, L.house_number, L.flat_number ? `Flat ${L.flat_number}` : null].filter(Boolean).join(", ") || null;
           const locationLine = [L.postal_code, L.city, L.province].filter(Boolean).join(", ") || null;
-
-          const yrsLabel = (n) => n != null ? `${n} year${n === 1 ? "" : "s"}` : null;
 
           const F = ({ label, value }) => (
             <div style={{ marginBottom: 8 }}>
@@ -558,8 +560,9 @@ function LeadsPage({ dateRange }) {
 
                 {/* Decision Snapshot — S.A.W. */}
                 <CardSection title="Decision Snapshot (S.A.W.)" icon="⚡">
-                  <F label="Years at Address" value={yrsLabel(L.years_at_address)} />
-                  <F label="Years at Job" value={yrsLabel(L.years_at_job)} />
+                  <F label="Time at Address" value={humanize(L.years_at_address)} />
+                  <F label="Time at Job" value={humanize(L.years_at_job)} />
+                  <F label="Income Longevity" value={humanize(L.income_longevity)} />
                   <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
                   <F label="Credit Score" value={L.credit_score ? String(L.credit_score) : null} />
                 </CardSection>
