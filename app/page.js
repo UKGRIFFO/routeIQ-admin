@@ -508,6 +508,29 @@ function LeadsPage({ dateRange }) {
           };
           const age = calcAge(L.date_of_birth);
 
+          const sinceLabel = (val, brackets) => {
+            if (!val) return null;
+            const str = String(val).trim();
+            // Try parsing as date
+            const d = new Date(str.replace(/ /g, '-'));
+            if (!isNaN(d) && d.getFullYear() > 1900) {
+              const now = new Date();
+              const totalMonths = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+              if (brackets === 'address') {
+                if (totalMonths < 12) return "< 1 year";
+                if (totalMonths < 36) return "1–3 years";
+                return "3+ years";
+              }
+              if (brackets === 'job') {
+                if (totalMonths < 6) return "< 6 months";
+                if (totalMonths < 12) return "6–12 months";
+                return "12+ months";
+              }
+              return humanize(str);
+            }
+            return humanize(str);
+          };
+
           const fmtDOB = (dob) => {
             if (!dob) return null;
             const d = new Date(dob);
@@ -561,9 +584,9 @@ function LeadsPage({ dateRange }) {
 
                 {/* Decision Snapshot — S.A.W. */}
                 <CardSection title="Decision Snapshot (S.A.W.)" icon="⚡">
-                  <F label="Time at Address" value={humanize(L.years_at_address)} />
-                  <F label="Time at Job" value={humanize(L.years_at_job)} />
-                  <F label="Income Longevity" value={humanize(L.income_longevity)} />
+                  <F label="Time at Address" value={sinceLabel(L.years_at_address, 'address')} />
+                  <F label="Time at Job" value={sinceLabel(L.years_at_job, 'job')} />
+                  <F label="Income Longevity" value={sinceLabel(L.income_longevity, 'job')} />
                   <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
                   <F label="Credit Score" value={L.credit_score ? String(L.credit_score) : null} />
                 </CardSection>
