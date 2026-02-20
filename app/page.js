@@ -576,7 +576,7 @@ function LenderForm({ open, lender, onClose, onSaved }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? `Edit ${lender?.name}` : "Add Lender"} w={620}>
+    <Modal open={open} onClose={onClose} title={isEdit ? `Edit ${lender?.name}` : "Add Buyer"} w={620}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Inp label="Lender Name" value={form.name || ""} onChange={e => up("name", e.target.value)} placeholder="e.g. FiestaCredito" />
@@ -620,11 +620,11 @@ function LendersPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: C.textDim }}>{lenders.length} lender{lenders.length !== 1 ? "s" : ""}</span>
-        <Btn v="primary" sz="sm" onClick={() => { setEditLender(null); setShowForm(true); }}>+ Add Lender</Btn>
+        <span style={{ fontSize: 12, color: C.textDim }}>{lenders.length} buyer{lenders.length !== 1 ? "s" : ""}</span>
+        <Btn v="primary" sz="sm" onClick={() => { setEditLender(null); setShowForm(true); }}>+ Add Buyer</Btn>
       </div>
       {loading ? <div style={{ textAlign: "center", padding: 60 }}><Spin sz={26} /></div> : lenders.length === 0 ? (
-        <Crd><Empty icon="🏦" title="No lenders configured" sub="Add your first lender to start distributing leads" /></Crd>
+        <Crd><Empty icon="🏦" title="No buyers configured" sub="Add your first buyer to start distributing leads" /></Crd>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 14 }}>
           {lenders.map(l => (
@@ -928,7 +928,7 @@ const NAV = [
   { id: "overview", label: "Overview", icon: "◐" },
   { id: "leads", label: "Leads", icon: "☰" },
   { id: "funnel", label: "Funnel", icon: "▽" },
-  { id: "lenders", label: "Lenders", icon: "⬡" },
+  { id: "lenders", label: "Buyers", icon: "⬡" },
   { id: "analytics", label: "Analytics", icon: "◧" },
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
