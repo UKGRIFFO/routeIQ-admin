@@ -24,6 +24,7 @@ const C = {
   rose: "#FB7185", roseDim: "rgba(251,113,133,.12)",
   orange: "#FB923C", orangeDim: "rgba(251,146,60,.12)",
   cyan: "#22D3EE", cyanDim: "rgba(34,211,238,.12)",
+  teal: "#2DD4BF", tealDim: "rgba(45,212,191,.12)",
 };
 
 const STATUS = {
@@ -32,7 +33,8 @@ const STATUS = {
   distributed:        { bg: C.violetDim, fg: C.violet, label: "Distributed", tip: "Sent to lender and accepted, awaiting redirect confirmation" },
   redirected:         { bg: C.cyanDim, fg: C.cyan, label: "Redirected", tip: "Customer's browser confirmed redirected to lender" },
   accepted:           { bg: C.mintDim, fg: C.mint, label: "Accepted", tip: "Lender confirmed acceptance via postback" },
-  sold:               { bg: C.mintDim, fg: C.mint, label: "Sold", tip: "Lead sold — revenue confirmed via postback" },
+  sold:               { bg: C.mintDim, fg: C.mint, label: "Sold", tip: "Instant sale — revenue confirmed immediately via API response (e.g. ScoresMatter)" },
+  converted:          { bg: C.tealDim, fg: C.teal, label: "Converted", tip: "Async sale — revenue confirmed later via lender postback (e.g. FiestaCredito)" },
   completed:          { bg: C.mintDim, fg: C.mint, label: "Completed", tip: "Customer completed the loan process with lender" },
   rejected:           { bg: C.redDim, fg: C.red, label: "Rejected", tip: "Lead rejected during processing" },
   rejected_by_lender: { bg: C.redDim, fg: C.red, label: "Buyer Reject", tip: "Lender API rejected this lead (check rejection reason)" },
@@ -420,7 +422,7 @@ function LeadsPage({ dateRange }) {
   const exportCSV = () => {
     if (!leads.length) return;
     const hdr = ["ID", "First Name", "Last Name", "Email", "Phone", "Loan Amount", "Status", "Redirect", "Revenue", "Response Time", "Source", "Created"];
-    const rows = leads.map(l => [l.id, l.first_name, l.last_name, l.email, l.phone, l.loan_amount, l.status, (l.status === 'redirected' || l.status === 'accepted' || l.status === 'sold' || l.status === 'completed') ? "Confirmed" : l.redirect_url ? "Accepted" : l.status === "rejected_by_lender" ? "Rejected" : "Pending", l.revenue || 0, l.response_time_ms || "", l.source, l.created_at]);
+    const rows = leads.map(l => [l.id, l.first_name, l.last_name, l.email, l.phone, l.loan_amount, l.status, (l.status === 'redirected' || l.status === 'accepted' || l.status === 'sold' || l.status === 'converted' || l.status === 'completed') ? "Confirmed" : l.redirect_url ? "Accepted" : l.status === "rejected_by_lender" ? "Rejected" : "Pending", l.revenue || 0, l.response_time_ms || "", l.source, l.created_at]);
     const csv = [hdr, ...rows].map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
   };
@@ -428,7 +430,7 @@ function LeadsPage({ dateRange }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <Sel label="Status" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value, page: 1 }))} options={[{ v: "", l: "All" }, { v: "new", l: "New" }, { v: "pending", l: "Pending" }, { v: "distributed", l: "Distributed" }, { v: "redirected", l: "Redirected" }, { v: "accepted", l: "Accepted" }, { v: "sold", l: "Sold" }, { v: "completed", l: "Completed" }, { v: "rejected", l: "Rejected" }, { v: "rejected_by_lender", l: "Rejected by Lender" }]} />
+        <Sel label="Status" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value, page: 1 }))} options={[{ v: "", l: "All" }, { v: "new", l: "New" }, { v: "pending", l: "Pending" }, { v: "distributed", l: "Distributed" }, { v: "redirected", l: "Redirected" }, { v: "accepted", l: "Accepted" }, { v: "sold", l: "Sold" }, { v: "converted", l: "Converted" }, { v: "completed", l: "Completed" }, { v: "rejected", l: "Rejected" }, { v: "rejected_by_lender", l: "Rejected by Lender" }]} />
         <Inp label="Source" placeholder="e.g. teprestamoshoy.es" value={filters.source} onChange={e => setFilters(f => ({ ...f, source: e.target.value, page: 1 }))} onKeyDown={e => e.key === "Enter" && load()} style={{ width: 180 }} />
         <Btn v="primary" sz="sm" onClick={() => load()}>Search</Btn>
         <Btn sz="sm" onClick={exportCSV}>↓ CSV</Btn>
@@ -458,7 +460,7 @@ function LeadsPage({ dateRange }) {
                   <td style={{ padding: "9px 14px", fontWeight: 700, color: C.gold, fontVariantNumeric: "tabular-nums" }}>{fm.eur(l.loan_amount)}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11.5 }}>{l.loan_purpose || "—"}</td>
                   <td style={{ padding: "9px 14px" }}><Badge status={l.status} /></td>
-                  <td style={{ padding: "9px 14px", textAlign: "center" }}>{l.status === 'redirected' || l.status === 'accepted' || l.status === 'sold' || l.status === 'completed' ? <span title="Confirmed redirected — browser verified hitting lender's page" style={{ color: C.mint, fontWeight: 800, fontSize: 13, cursor: "help" }}>✓✓</span> : l.redirect_url && l.status === 'distributed' ? <span title="Lender accepted — awaiting browser redirect confirmation" style={{ color: C.gold, fontWeight: 800, fontSize: 13, cursor: "help" }}>✓</span> : l.status === "rejected_by_lender" ? <span title="Rejected by lender — check lead detail for reason" style={{ color: C.red, fontWeight: 800, fontSize: 13, cursor: "help" }}>✕</span> : <span title="Not yet sent to lender" style={{ color: C.textGhost, cursor: "help" }}>—</span>}</td>
+                  <td style={{ padding: "9px 14px", textAlign: "center" }}>{l.status === 'redirected' || l.status === 'accepted' || l.status === 'sold' || l.status === 'converted' || l.status === 'completed' ? <span title="Confirmed redirected — browser verified hitting lender's page" style={{ color: C.mint, fontWeight: 800, fontSize: 13, cursor: "help" }}>✓✓</span> : l.redirect_url && l.status === 'distributed' ? <span title="Lender accepted — awaiting browser redirect confirmation" style={{ color: C.gold, fontWeight: 800, fontSize: 13, cursor: "help" }}>✓</span> : l.status === "rejected_by_lender" ? <span title="Rejected by lender — check lead detail for reason" style={{ color: C.red, fontWeight: 800, fontSize: 13, cursor: "help" }}>✕</span> : <span title="Not yet sent to lender" style={{ color: C.textGhost, cursor: "help" }}>—</span>}</td>
                   <td style={{ padding: "9px 14px", fontWeight: 800, color: parseFloat(l.revenue) > 0 ? C.mint : C.textGhost, fontVariantNumeric: "tabular-nums" }}>{parseFloat(l.revenue) > 0 ? fm.eur(l.revenue) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: l.response_time_ms ? C.cyan : C.textGhost, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontSize: 11.5 }}>{l.response_time_ms ? fm.ms(l.response_time_ms) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11 }}>{l.source}</td>
@@ -484,7 +486,7 @@ function LeadsPage({ dateRange }) {
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>FiestaCredito Details</div>
                 <div style={{ padding: "14px 16px", background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect Status</div><div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: detail.lead.status === 'redirected' || detail.lead.status === 'accepted' || detail.lead.status === 'sold' || detail.lead.status === 'completed' ? C.mint : detail.lead.redirect_url ? C.gold : detail.lead.status === "rejected_by_lender" ? C.red : C.gold }}>{detail.lead.status === 'redirected' || detail.lead.status === 'accepted' || detail.lead.status === 'sold' || detail.lead.status === 'completed' ? "✓✓ Confirmed Redirected" : detail.lead.redirect_url ? "✓ Accepted (not confirmed)" : detail.lead.status === "rejected_by_lender" ? "✕ Rejected" : "⏳ Pending"}</div></div>
+                  <div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Redirect Status</div><div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: detail.lead.status === 'redirected' || detail.lead.status === 'accepted' || detail.lead.status === 'sold' || detail.lead.status === 'converted' || detail.lead.status === 'completed' ? C.mint : detail.lead.redirect_url ? C.gold : detail.lead.status === "rejected_by_lender" ? C.red : C.gold }}>{detail.lead.status === 'redirected' || detail.lead.status === 'accepted' || detail.lead.status === 'sold' || detail.lead.status === 'converted' || detail.lead.status === 'completed' ? "✓✓ Confirmed Redirected" : detail.lead.redirect_url ? "✓ Accepted (not confirmed)" : detail.lead.status === "rejected_by_lender" ? "✕ Rejected" : "⏳ Pending"}</div></div>
                   {detail.lead.fiesta_lead_id && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Fiesta Lead ID</div><div style={{ fontSize: 12, color: C.text, marginTop: 2, fontFamily: "monospace" }}>{detail.lead.fiesta_lead_id}</div></div>)}
                   {detail.lead.response_time_ms != null && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Response Time</div><div style={{ fontSize: 14, color: C.cyan, fontWeight: 800, marginTop: 2 }}>{fm.ms(detail.lead.response_time_ms)} <span style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>({fm.msRaw(detail.lead.response_time_ms)})</span></div></div>)}
                   {detail.lead.distributed_at && (<div><div style={{ fontSize: 9, fontWeight: 700, color: C.textGhost, textTransform: "uppercase" }}>Distributed At</div><div style={{ fontSize: 12, color: C.text, marginTop: 2 }}>{fm.dt(detail.lead.distributed_at)}</div></div>)}
@@ -576,10 +578,10 @@ function LenderForm({ open, lender, onClose, onSaved }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? `Edit ${lender?.name}` : "Add Buyer"} w={620}>
+    <Modal open={open} onClose={onClose} title={isEdit ? `Edit ${lender?.name}` : "Add Lender"} w={620}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Inp label="Buyer Name" value={form.name || ""} onChange={e => up("name", e.target.value)} placeholder="e.g. FiestaCredito" />
+          <Inp label="Lender Name" value={form.name || ""} onChange={e => up("name", e.target.value)} placeholder="e.g. FiestaCredito" />
           <Sel label="Auth Type" value={form.auth_type || "bearer"} onChange={e => up("auth_type", e.target.value)} options={[{ v: "bearer", l: "Bearer Token" }, { v: "basic", l: "Basic Auth" }, { v: "header", l: "Custom Header" }, { v: "none", l: "None" }]} />
         </div>
         <Inp label="API Endpoint" value={form.api_endpoint || ""} onChange={e => up("api_endpoint", e.target.value)} placeholder="https://api.lender.com/leads" />
@@ -620,11 +622,11 @@ function LendersPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: C.textDim }}>{lenders.length} buyer{lenders.length !== 1 ? "s" : ""}</span>
-        <Btn v="primary" sz="sm" onClick={() => { setEditLender(null); setShowForm(true); }}>+ Add Buyer</Btn>
+        <span style={{ fontSize: 12, color: C.textDim }}>{lenders.length} lender{lenders.length !== 1 ? "s" : ""}</span>
+        <Btn v="primary" sz="sm" onClick={() => { setEditLender(null); setShowForm(true); }}>+ Add Lender</Btn>
       </div>
       {loading ? <div style={{ textAlign: "center", padding: 60 }}><Spin sz={26} /></div> : lenders.length === 0 ? (
-        <Crd><Empty icon="🏦" title="No buyers configured" sub="Add your first buyer to start distributing leads" /></Crd>
+        <Crd><Empty icon="🏦" title="No lenders configured" sub="Add your first lender to start distributing leads" /></Crd>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 14 }}>
           {lenders.map(l => (
@@ -928,7 +930,7 @@ const NAV = [
   { id: "overview", label: "Overview", icon: "◐" },
   { id: "leads", label: "Leads", icon: "☰" },
   { id: "funnel", label: "Funnel", icon: "▽" },
-  { id: "lenders", label: "Buyers", icon: "⬡" },
+  { id: "lenders", label: "Lenders", icon: "⬡" },
   { id: "analytics", label: "Analytics", icon: "◧" },
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
