@@ -488,7 +488,10 @@ function LeadsPage({ dateRange }) {
             mudanza: "Moving", impuestos: "Taxes", deudas: "Debts", inversion: "Investment",
             formacion: "Training", ocio: "Leisure", mascotas: "Pets", viaje: "Travel",
             compras: "Shopping", hogar: "Home", familia: "Family", emergencia: "Emergency",
-            refinanciacion: "Refinancing",
+            refinanciacion: "Refinancing", no_especificado: "Not Specified",
+            creacion_mejora_historial_crediticio: "Credit History Building",
+            creacion_mejora_del_historial_crediticio: "Credit History Building",
+            mejora_historial: "Credit History Building",
           };
           // Humanize: "not_married" → "Not Married", "living_with_parents" → "Living With Parents"
           const humanize = (s) => {
