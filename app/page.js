@@ -388,6 +388,7 @@ function OverviewPage({ dateRange }) {
 // LEADS PAGE
 // ═══════════════════════════════════════════════════════════════════
 function LeadsPage({ dateRange }) {
+  const tc = s => s ? s.replace(/\b\w/g, c => c.toUpperCase()) : s;
   const [leads, setLeads] = useState([]);
   const [pg, setPg] = useState({ page: 1, totalPages: 1, totalCount: 0 });
   const [filters, setFilters] = useState({ status: "", source: "", page: 1 });
@@ -455,7 +456,7 @@ function LeadsPage({ dateRange }) {
                 <tr key={l.id} onClick={() => openDetail(l)} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer", transition: "background .1s" }} onMouseEnter={e => e.currentTarget.style.background = C.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>#{l.id}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11, whiteSpace: "nowrap" }}>{fm.dt(l.created_at)}</td>
-                  <td style={{ padding: "9px 14px", fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>{l.first_name} {l.last_name}</td>
+                  <td style={{ padding: "9px 14px", fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>{tc(l.first_name)} {tc(l.last_name)}</td>
                   <td style={{ padding: "9px 14px", color: C.textSoft, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>{l.email}</td>
                   <td style={{ padding: "9px 14px", color: C.textSoft, fontVariantNumeric: "tabular-nums" }}>{l.phone}</td>
                   <td style={{ padding: "9px 14px", fontWeight: 700, color: C.gold, fontVariantNumeric: "tabular-nums" }}>{fm.eur(l.loan_amount)}</td>
@@ -542,7 +543,7 @@ function LeadsPage({ dateRange }) {
               {/* Header — badge right-aligned */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 16, fontWeight: 900, color: C.text }}>Lead #{L.id} — {L.first_name} {L.last_name}{L.second_last_name ? ` ${L.second_last_name}` : ""}</span>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: C.text }}>Lead #{L.id} — {tc(L.first_name)} {tc(L.last_name)}{L.second_last_name ? ` ${tc(L.second_last_name)}` : ""}</span>
                   {age && <span style={{ fontSize: 13, color: C.textSoft, fontWeight: 600 }}>· {age}yrs</span>}
                   {L.gender && <span style={{ fontSize: 13, color: C.textSoft, fontWeight: 600 }}>· {humanize(L.gender)}</span>}
                 </div>
