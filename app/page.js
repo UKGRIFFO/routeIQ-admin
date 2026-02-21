@@ -44,6 +44,7 @@ const STATUS = {
   rejected_by_lender: { bg: C.redDim, fg: C.red, label: "Buyer Reject", tip: "Lender API rejected this lead (check rejection reason)" },
   duplicate:          { bg: C.goldDim, fg: C.gold, label: "Duplicate", tip: "Duplicate lead detected — same email/phone/name combo" },
   error:              { bg: C.roseDim, fg: C.rose, label: "Error", tip: "Something went wrong processing this lead" },
+  fraud_blocked:      { bg: C.redDim, fg: C.red, label: "Fraud Block", tip: "Blocked by fraud scoring engine — not sent to lender" },
 };
 
 const fm = {
@@ -509,10 +510,10 @@ function LeadsPage({ dateRange }) {
       <Crd>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{[{h:"ID"}, {h:"Created"}, {h:"Name"}, {h:"Email"}, {h:"Phone"}, {h:"Amount", tip:"Requested loan amount"}, {h:"Purpose"}, {h:"Status", tip:"Current pipeline status — hover the badge for details"}, {h:"Redirect", tip:"✓✓ = browser confirmed redirect · ✓ = lender accepted, not yet confirmed · ✕ = rejected · — = pending"}, {h:"Commission", tip:"Revenue earned from this lead via lender postback"}, {h:"Response", tip:"Time taken for lender API to respond"}, {h:"Source"}].map(({h, tip}) => (<th key={h} title={tip} style={{ padding: "11px 14px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", whiteSpace: "nowrap", cursor: tip ? "help" : "default", borderBottom: tip ? `1px dashed ${C.textGhost}` : "none" }}>{h}</th>))}</tr></thead>
+            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{[{h:"ID"}, {h:"Created"}, {h:"Name"}, {h:"Email"}, {h:"Phone"}, {h:"Amount", tip:"Requested loan amount"}, {h:"Purpose"}, {h:"Status", tip:"Current pipeline status — hover the badge for details"}, {h:"Fraud", tip:"Fraud score 0-100 — leads ≥ threshold are auto-blocked"}, {h:"Redirect", tip:"✓✓ = browser confirmed redirect · ✓ = lender accepted, not yet confirmed · ✕ = rejected · — = pending"}, {h:"Commission", tip:"Revenue earned from this lead via lender postback"}, {h:"Response", tip:"Time taken for lender API to respond"}, {h:"Source"}].map(({h, tip}) => (<th key={h} title={tip} style={{ padding: "11px 14px", textAlign: "left", fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".07em", whiteSpace: "nowrap", cursor: tip ? "help" : "default", borderBottom: tip ? `1px dashed ${C.textGhost}` : "none" }}>{h}</th>))}</tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={12} style={{ textAlign: "center", padding: 48 }}><Spin /></td></tr> :
-               leads.length === 0 ? <tr><td colSpan={12}><Empty icon="📭" title="No leads found" sub="Adjust filters or wait for new leads" /></td></tr> :
+              {loading ? <tr><td colSpan={13} style={{ textAlign: "center", padding: 48 }}><Spin /></td></tr> :
+               leads.length === 0 ? <tr><td colSpan={13}><Empty icon="📭" title="No leads found" sub="Adjust filters or wait for new leads" /></td></tr> :
                leads.map(l => (
                 <tr key={l.id} onClick={() => openDetail(l)} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer", transition: "background .1s" }} onMouseEnter={e => e.currentTarget.style.background = C.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>#{l.id}</td>
@@ -523,6 +524,7 @@ function LeadsPage({ dateRange }) {
                   <td style={{ padding: "9px 14px", fontWeight: 700, color: C.gold, fontVariantNumeric: "tabular-nums" }}>{fm.eur(l.loan_amount)}</td>
                   <td style={{ padding: "9px 14px", color: C.textDim, fontSize: 11.5 }}>{l.loan_purpose || "—"}</td>
                   <td style={{ padding: "9px 14px" }}><Badge status={l.status} /></td>
+                  <td style={{ padding: "9px 14px", textAlign: "center", fontWeight: 700, fontSize: 11, fontVariantNumeric: "tabular-nums", color: l.fraud_score >= 70 ? C.red : l.fraud_score >= 40 ? C.gold : l.fraud_score > 0 ? C.textDim : C.textGhost }}>{l.fraud_score > 0 ? l.fraud_score : "—"}</td>
                   <td style={{ padding: "9px 14px", textAlign: "center" }}>{l.status === 'redirected' || l.status === 'accepted' || l.status === 'sold' || l.status === 'converted' || l.status === 'completed' ? <span title="Confirmed redirected — browser verified hitting lender's page" style={{ color: C.mint, fontWeight: 800, fontSize: 13, cursor: "help" }}>✓✓</span> : l.redirect_url && l.status === 'distributed' ? <span title="Lender accepted — awaiting browser redirect confirmation" style={{ color: C.gold, fontWeight: 800, fontSize: 13, cursor: "help" }}>✓</span> : l.status === "rejected_by_lender" ? <span title="Rejected by lender — check lead detail for reason" style={{ color: C.red, fontWeight: 800, fontSize: 13, cursor: "help" }}>✕</span> : <span title="Not yet sent to lender" style={{ color: C.textGhost, cursor: "help" }}>—</span>}</td>
                   <td style={{ padding: "9px 14px", fontWeight: 800, color: parseFloat(l.revenue) > 0 ? C.mint : C.textGhost, fontVariantNumeric: "tabular-nums" }}>{parseFloat(l.revenue) > 0 ? fm.eur(l.revenue) : "—"}</td>
                   <td style={{ padding: "9px 14px", color: l.response_time_ms ? C.cyan : C.textGhost, fontWeight: 700, fontVariantNumeric: "tabular-nums", fontSize: 11.5 }}>{l.response_time_ms ? fm.ms(l.response_time_ms) : "—"}</td>
