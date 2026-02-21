@@ -2,12 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell
 } from "recharts";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://loan-broker-backend-production.up.railway.app/api";
+
+// ── Dynamic import: Fraud Dashboard (lives in app/fraud/page.js) ──
+const FraudDashboard = dynamic(() => import('./fraud/page'), { ssr: false, loading: () => <div style={{ display: "flex", justifyContent: "center", padding: 100 }}><Spin sz={30} /></div> });
 
 // ═══════════════════════════════════════════════════════════════════
 // DESIGN SYSTEM
@@ -534,7 +538,6 @@ function LeadsPage({ dateRange }) {
       <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); setCollapsed({ identity: true, system: true }); }} title="" w={720}>
         {detailLoading ? <div style={{ textAlign: "center", padding: 44 }}><Spin sz={26} /></div> : detail?.lead ? (() => {
           const L = detail.lead;
-          // Humanize: "not_married" → "Not Married", "living_with_parents" → "Living With Parents"
           const humanize = (s) => {
             if (!s || typeof s !== "string") return s;
             return s.replace(/[_-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -556,12 +559,10 @@ function LeadsPage({ dateRange }) {
           const sinceLabel = (val, brackets) => {
             if (!val) return null;
             const str = String(val).trim().toLowerCase();
-            // Map form values to card labels
             const addressMap = { less_one: "< 1 year", less_1: "< 1 year", one_three: "1–3 years", "1_3": "1–3 years", more_three: "3+ years", more_3: "3+ years" };
             const jobMap = { less_six: "< 6 months", less_6: "< 6 months", six_twelve: "6–12 months", "6_12": "6–12 months", more_twelve: "12+ months", more_12: "12+ months" };
             if (brackets === 'address' && addressMap[str]) return addressMap[str];
             if (brackets === 'job' && jobMap[str]) return jobMap[str];
-            // Try parsing as date
             const d = new Date(str.replace(/ /g, '-'));
             if (!isNaN(d) && d.getFullYear() > 1900) {
               const now = new Date();
@@ -612,7 +613,6 @@ function LeadsPage({ dateRange }) {
 
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Header — badge right-aligned */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 16, fontWeight: 900, color: C.text }}>Lead #{L.id} — {tc(L.first_name)} {tc(L.last_name)}{L.second_last_name ? ` ${tc(L.second_last_name)}` : ""}</span>
@@ -622,16 +622,13 @@ function LeadsPage({ dateRange }) {
                 <Badge status={L.status} />
               </div>
 
-              {/* Cards grid */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {/* Contact */}
                 <CardSection title="Contact" icon="📞">
                   <F label="Phone" value={L.phone} />
                   <F label="Email" value={L.email} />
                   <F label="Created" value={fm.dt(L.created_at)} />
                 </CardSection>
 
-                {/* Decision Snapshot — S.A.W. */}
                 <CardSection title="Decision Snapshot (S.A.W.)" icon="⚡">
                   <F label="Time at Address" value={sinceLabel(L.years_at_address, 'address')} />
                   <F label="Time at Job" value={sinceLabel(L.years_at_job, 'job')} />
@@ -640,7 +637,6 @@ function LeadsPage({ dateRange }) {
                   <F label="Credit Score" value={L.credit_score ? String(L.credit_score) : null} />
                 </CardSection>
 
-                {/* Personal */}
                 <CardSection title="Personal" icon="👤">
                   <F label="Marital Status" value={humanize(L.marital_status)} />
                   <F label="Housing" value={humanize(L.housing_tenure)} />
@@ -648,14 +644,12 @@ function LeadsPage({ dateRange }) {
                   <F label="Education" value={humanize(L.education)} />
                 </CardSection>
 
-                {/* Address */}
                 <CardSection title="Address" icon="📍">
                   <F label="Street" value={addressLine} />
                   <F label="Location" value={locationLine} />
                   <F label="Country" value={L.country} />
                 </CardSection>
 
-                {/* Income & Employment */}
                 <CardSection title="Income & Employment" icon="💼">
                   <F label="Employment" value={humanize(L.income_source)} />
                   <F label="Job Level" value={humanize(L.job_level)} />
@@ -663,14 +657,12 @@ function LeadsPage({ dateRange }) {
                   <F label="Monthly Income" value={L.monthly_income ? fm.eur(L.monthly_income) : null} />
                 </CardSection>
 
-                {/* Loan Request */}
                 <CardSection title="Loan Request" icon="💰">
                   <F label="Amount" value={fm.eur(L.loan_amount)} />
                   <F label="Period" value={L.loan_period ? `${L.loan_period} days` : null} />
                   <F label="Purpose" value={purposeDisplay} />
                 </CardSection>
 
-                {/* Identity — collapsed by default */}
                 <CardSection title="Identity" icon="🪪" collapsible collapsed={collapsed.identity} onToggle={() => setCollapsed(c => ({ ...c, identity: !c.identity }))}>
                   <F label="DNI" value={L.personal_code} />
                   <F label="Gender" value={humanize(L.gender)} />
@@ -678,7 +670,6 @@ function LeadsPage({ dateRange }) {
                 </CardSection>
               </div>
 
-              {/* System card — full width, collapsed */}
               <CardSection title="System" icon="⚙" collapsible collapsed={collapsed.system} onToggle={() => setCollapsed(c => ({ ...c, system: !c.system }))}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
                   <F label="Lead ID" value={String(L.id)} />
@@ -688,7 +679,6 @@ function LeadsPage({ dateRange }) {
                 </div>
               </CardSection>
 
-              {/* FiestaCredito Details */}
               {(L.fiesta_lead_id || L.redirect_url || L.response_time_ms || L.rejection_reason || parseFloat(L.revenue) > 0 || L.distributed_at || L.status === "rejected_by_lender" || L.status === "distributed") && (
                 <div style={{ background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, padding: "14px 16px" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 12, textTransform: "uppercase", letterSpacing: ".06em" }}>FiestaCredito Details</div>
@@ -704,7 +694,6 @@ function LeadsPage({ dateRange }) {
                 </div>
               )}
 
-              {/* Postback Events */}
               {detail.postbacks?.length > 0 && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Postback Events</div>
@@ -724,7 +713,6 @@ function LeadsPage({ dateRange }) {
 
               {detail.distributions?.length > 0 && (<div><div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Distribution History</div>{detail.distributions.map((d, i) => (<div key={i} style={{ padding: "12px 14px", background: C.panel, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${C.border}`, marginBottom: 8 }}><div><div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>{d.lender_name}</div><div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Sent {fm.dt(d.sent_at)} · {fm.ms(d.response_time_ms)} response</div></div><div style={{ textAlign: "right" }}><Badge status={d.was_purchased ? "sold" : d.response_status === "rejected" ? "rejected" : "distributed"} />{d.sale_price != null && <div style={{ fontSize: 12, fontWeight: 800, color: C.mint, marginTop: 4 }}>{fm.eur(d.sale_price)}</div>}</div></div>))}</div>)}
 
-              {/* Redirect Confirmation Log */}
               {detail.redirectLogs?.length > 0 && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>Redirect Confirmation Log</div>
@@ -1003,7 +991,6 @@ function FunnelPage({ dateRange }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Summary stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14 }}>
         <Stat label="Unique Visitors" value={fm.num(totalSessions)} icon="👁" color={C.sky} tip="Unique browser sessions that loaded teprestamoshoy.es" />
         <Stat label="Form Started" value={fm.num(step1)} sub={`${simulatorToForm}% of visitors`} icon="✏️" color={C.gold} tip="Visitors who progressed past the loan simulator to Step 1 of the form" />
@@ -1012,7 +999,6 @@ function FunnelPage({ dateRange }) {
         <Stat label="Redirect Rate" value={summary?.submittedToLender > 0 ? fm.pct(summary.redirectedLeads / summary.submittedToLender) : "—"} sub={`${fm.num(summary?.confirmedRedirects || 0)} confirmed of ${fm.num(summary?.redirectedLeads || 0)} accepted`} icon="↗" color={summary?.submittedToLender > 0 ? (summary.redirectedLeads / summary.submittedToLender >= 0.9 ? C.mint : summary.redirectedLeads / summary.submittedToLender >= 0.7 ? C.gold : C.red) : C.textDim} tip="% of submitted leads that the lender accepted. 'Confirmed' = browser verified hitting lender's page." />
       </div>
 
-      {/* Post-submission pipeline */}
       {summary?.submittedToLender > 0 && (
         <Crd style={{ padding: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 4 }}>Post-Submission Pipeline</div>
@@ -1041,7 +1027,6 @@ function FunnelPage({ dateRange }) {
         </Crd>
       )}
 
-      {/* Visual funnel */}
       <Crd style={{ padding: 24 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 18 }}>Conversion Funnel</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1087,7 +1072,6 @@ function FunnelPage({ dateRange }) {
         </div>
       </Crd>
 
-      {/* Drop-off analysis */}
       {data?.dropoff && Object.keys(data.dropoff).length > 0 && (
         <Crd style={{ padding: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 14 }}>Drop-off Analysis</div>
@@ -1121,7 +1105,6 @@ function FunnelPage({ dateRange }) {
         </Crd>
       )}
 
-      {/* Empty state */}
       {totalSessions === 0 && !loading && (
         <Crd style={{ padding: 40 }}>
           <Empty icon="📊" title="No funnel data yet" sub="Events will appear once the tracking snippet is installed on teprestamoshoy.es" />
@@ -1140,6 +1123,7 @@ const NAV = [
   { id: "funnel", label: "Funnel", icon: "▽" },
   { id: "lenders", label: "Lenders", icon: "⬡" },
   { id: "analytics", label: "Analytics", icon: "◧" },
+  { id: "fraud", label: "Fraud", icon: "🛡" },
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
 
@@ -1197,6 +1181,7 @@ export default function DashboardPage() {
           {page === "funnel" && <FunnelPage dateRange={dateRange} />}
           {page === "lenders" && <LendersPage />}
           {page === "analytics" && <AnalyticsPage dateRange={dateRange} />}
+          {page === "fraud" && <FraudDashboard />}
           {page === "settings" && <SettingsPage />}
         </div>
       </main>
