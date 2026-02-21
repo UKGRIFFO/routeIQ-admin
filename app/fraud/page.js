@@ -171,10 +171,11 @@ function MultiIPRow({lead}){
 function SpeedRow({item}){
   const secs=parseFloat(item.completion_seconds)||0;
   const sev=secs<30?"critical":secs<60?"high":"medium";
-  const name=[item.first_name,item.last_name].filter(Boolean).join(" ")||"—";
+  const name=[item.first_name,item.last_name].filter(Boolean).join(" ");
+  const hasIdentity=name||item.email;
   return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 100px 100px",alignItems:"center",padding:"8px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12}}>
-    <div style={{color:C.text,fontWeight:600}}>{name}</div>
-    <div style={{color:C.textDim}}>{item.email||"—"}</div>
+    <div style={{color:hasIdentity?C.text:C.textGhost,fontWeight:600}}>{name||item.ip_address||"Unknown"}</div>
+    <div style={{color:hasIdentity?C.textDim:C.textGhost}}>{item.email||(hasIdentity?"—":"No lead submitted")}</div>
     <div style={{fontFamily:"monospace",fontWeight:700,color:sev==="critical"?C.danger:sev==="high"?C.accent:C.warn,textAlign:"center"}}>{secs<60?`${Math.round(secs)}s`:`${(secs/60).toFixed(1)}m`}</div>
     <div style={{textAlign:"center"}}><SeverityBadge level={sev}/></div>
   </div>;
@@ -355,7 +356,7 @@ export default function FraudDashboard({dateRange, onDateChange}){
         </div>
       </div>
 
-      {/* ── Hourly Pattern (CET) ── */}
+      {/* 1. Submission Patterns */}
       <Section title="Submission Patterns" subtitle="Hourly distribution (red = 2am-6am Spanish time)" severity="info" defaultOpen={true}>
         <div style={{padding:"16px 20px"}}>
           <HourlyChart data={data.hourlyPattern}/>
@@ -363,21 +364,7 @@ export default function FraudDashboard({dateRange, onDateChange}){
         </div>
       </Section>
 
-      {/* ── Speed Analysis ── */}
-      <Section title="Speed Analysis" subtitle="Suspiciously fast form completions" count={fastCount} severity={fastCount>0?(parseInt(speedDist.critical_count)||0)>0?"critical":"high":"info"}>
-        <div style={{padding:"16px 20px"}}>
-          <SpeedDistChart dist={speedDist}/>
-          <div style={{fontSize:10,color:C.textGhost,marginTop:8,textAlign:"center"}}>Red: under 30s (bot) · Orange: 30-60s · Amber: 1-2min · Green: normal (2min+)</div>
-        </div>
-        {speedAnalysis.length>0&&<>
-          <div style={{padding:"6px 16px",fontSize:11,color:C.textDim,borderBottom:`1px solid ${C.border}`}}>Top {speedAnalysis.length} fastest of {fastCount} suspicious sessions</div>
-          <TH columns={[{l:"Name",w:"1fr"},{l:"Email",w:"1fr"},{l:"Time",w:"100px",a:"center"},{l:"Severity",w:"100px",a:"center"}]}/>
-          {speedAnalysis.map((s,i)=><SpeedRow key={i} item={s}/>)}
-        </>}
-        {speedAnalysis.length===0&&<div style={{padding:20,textAlign:"center",color:C.textGhost,fontSize:12}}>No suspiciously fast completions detected ✓</div>}
-      </Section>
-
-      {/* ── IP Clusters ── */}
+      {/* 2. IP Clusters */}
       <Section title="IP Address Clusters" subtitle={whitelistOn?"Multiple leads from same IP (whitelist applied)":"Multiple leads from same IP"} count={data.ipClusters?.length||0} severity={(data.ipClusters||[]).some(c=>parseInt(c.lead_count)>=5)?"critical":"high"}>
         <TH columns={[{l:"IP Address",w:"1fr"},{l:"Leads",w:"80px",a:"center"},{l:"Emails",w:"80px",a:"center"},{l:"Span",w:"60px",a:"center"},{l:"Severity",w:"100px",a:"center"},{l:"",w:"40px"}]}/>
         {(data.ipClusters||[]).length===0
@@ -385,7 +372,7 @@ export default function FraudDashboard({dateRange, onDateChange}){
           :data.ipClusters.map((c,i)=><IPClusterRow key={i} cluster={c}/>)}
       </Section>
 
-      {/* ── Rapid Submissions ── */}
+      {/* 3. Rapid Submissions */}
       <Section title="Rapid Submissions" subtitle="Leads within 5 min of each other (same IP, email, or phone)" count={data.rapidSubmissions?.length||0} severity={(data.rapidSubmissions||[]).some(r=>Math.abs(parseFloat(r.seconds_apart))<30)?"critical":"high"}>
         <TH columns={[{l:"Lead",w:"60px"},{l:"Applicant",w:"1fr"},{l:"Related To",w:"1fr"},{l:"Gap",w:"80px",a:"center"},{l:"Severity",w:"80px",a:"center"}]}/>
         {(data.rapidSubmissions||[]).length===0
@@ -393,7 +380,31 @@ export default function FraudDashboard({dateRange, onDateChange}){
           :data.rapidSubmissions.map((r,i)=><RapidRow key={i} item={r}/>)}
       </Section>
 
-      {/* ── Phone Reuse ── */}
+      {/* 4. Speed Analysis */}
+      <Section title="Speed Analysis" subtitle="Suspiciously fast form completions" count={fastCount} severity={fastCount>0?(parseInt(speedDist.critical_count)||0)>0?"critical":"high":"info"}>
+        <div style={{padding:"16px 20px"}}>
+          <SpeedDistChart dist={speedDist}/>
+          <div style={{fontSize:10,color:C.textGhost,marginTop:8,textAlign:"center"}}>Red: under 30s (bot) · Orange: 30-60s · Amber: 1-2min · Green: normal (2min+)</div>
+        </div>
+        {speedAnalysis.length>0&&<>
+          <div style={{padding:"6px 16px",fontSize:11,color:C.textDim,borderBottom:`1px solid ${C.border}`}}>Top {speedAnalysis.length} fastest of {fastCount} suspicious sessions</div>
+          <TH columns={[{l:"Name / IP",w:"1fr"},{l:"Email",w:"1fr"},{l:"Time",w:"100px",a:"center"},{l:"Severity",w:"100px",a:"center"}]}/>
+          {speedAnalysis.map((s,i)=><SpeedRow key={i} item={s}/>)}
+        </>}
+        {speedAnalysis.length===0&&<div style={{padding:20,textAlign:"center",color:C.textGhost,fontSize:12}}>No suspiciously fast completions detected ✓</div>}
+      </Section>
+
+      {/* 5. Behavioral Signals: Paste Detection */}
+      <Section title="Behavioral Signals — Paste Detection" subtitle="Sessions with high paste activity (3+ fields)" count={pasteAnalysis.length} severity={pasteAnalysis.some(p=>parseInt(p.paste_count)>=6)?"high":"medium"} defaultOpen={pasteAnalysis.length>0}>
+        {pasteAnalysis.length>0?<>
+          <TH columns={[{l:"Session",w:"120px"},{l:"Pastes",w:"60px",a:"center"},{l:"Fields",w:"1fr"},{l:"Severity",w:"100px",a:"center"}]}/>
+          {pasteAnalysis.map((p,i)=><PasteRow key={i} item={p}/>)}
+        </>:<div style={{padding:20,textAlign:"center",color:C.textGhost,fontSize:12}}>
+          No high-paste sessions detected yet — paste tracking is active and will populate as data arrives.
+        </div>}
+      </Section>
+
+      {/* 6. Phone Reuse */}
       <Section title="Phone Number Reuse" subtitle="Same phone across multiple applications" count={data.phoneReuse?.length||0} severity={(data.phoneReuse||[]).some(p=>parseInt(p.use_count)>=4)?"high":"medium"} defaultOpen={false}>
         <TH columns={[{l:"Phone",w:"140px"},{l:"Uses",w:"60px",a:"center"},{l:"Names",w:"1fr"},{l:"Severity",w:"80px",a:"center"}]}/>
         {(data.phoneReuse||[]).length===0
@@ -401,7 +412,7 @@ export default function FraudDashboard({dateRange, onDateChange}){
           :data.phoneReuse.map((p,i)=><PhoneRow key={i} item={p}/>)}
       </Section>
 
-      {/* ── Email Domain Concentration ── */}
+      {/* 7. Email Domain Concentration */}
       <Section title="Email Domain Concentration" subtitle="Domains with 3+ applications" count={data.suspiciousEmails?.length||0} severity="medium" defaultOpen={false}>
         <TH columns={[{l:"Domain",w:"1fr"},{l:"Count",w:"60px",a:"center"},{l:"Names",w:"1fr"},{l:"Severity",w:"80px",a:"center"}]}/>
         {(data.suspiciousEmails||[]).length===0
@@ -409,24 +420,13 @@ export default function FraudDashboard({dateRange, onDateChange}){
           :data.suspiciousEmails.map((e,i)=><EmailDomainRow key={i} item={e}/>)}
       </Section>
 
-      {/* ── Multi-IP Submissions (moved above Rejections) ── */}
+      {/* 8. Multi-IP Submissions */}
       {(data.nonStandardIps||[]).length>0&&<Section title="Multi-IP Submissions" subtitle="Leads with comma-separated IPs (proxy/CDN detected)" count={data.nonStandardIps?.length||0} severity="low" defaultOpen={false}>
         <TH columns={[{l:"Lead",w:"60px"},{l:"Applicant",w:"1fr"},{l:"IP Address",w:"1fr"},{l:"Severity",w:"80px",a:"center"}]}/>
         {data.nonStandardIps.map((l,i)=><MultiIPRow key={i} lead={l}/>)}
       </Section>}
 
-      {/* ── Behavioral Signals: Paste Detection ── */}
-      <Section title="Behavioral Signals — Paste Detection" subtitle="Sessions with high paste activity (3+ fields)" count={pasteAnalysis.length} severity={pasteAnalysis.some(p=>parseInt(p.paste_count)>=6)?"high":"medium"} defaultOpen={pasteAnalysis.length>0}>
-        {pasteAnalysis.length>0?<>
-          <TH columns={[{l:"Session",w:"120px"},{l:"Pastes",w:"60px",a:"center"},{l:"Fields",w:"1fr"},{l:"Severity",w:"100px",a:"center"}]}/>
-          {pasteAnalysis.map((p,i)=><PasteRow key={i} item={p}/>)}
-        </>:<div style={{padding:20,textAlign:"center",color:C.textGhost,fontSize:12}}>
-          No high-paste sessions detected. Add paste tracking to your Framer form to enable this feature.
-          <br/><span style={{fontSize:10,marginTop:4,display:"inline-block"}}>See the framer-paste-detection.js snippet for setup instructions.</span>
-        </div>}
-      </Section>
-
-      {/* ── Rejection Reasons (bottom) ── */}
+      {/* 9. Rejection Reasons (always last) */}
       <Section title="Rejection Reasons" subtitle="Why FiestaCredito rejected leads" count={data.rejectionReasons?.length||0} severity="info" defaultOpen={false}>
         <RejectionBreakdown reasons={data.rejectionReasons}/>
       </Section>
