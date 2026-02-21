@@ -244,6 +244,13 @@ export default function FraudDashboard({dateRange, onDateChange}){
   const[showWLPanel,setShowWLPanel]=useState(false);
   const[newIP,setNewIP]=useState("");
   const fetchRef=useRef(0);
+  // Phase 2 state
+  const[blockedLeads,setBlockedLeads]=useState([]);
+  const[blockedTotal,setBlockedTotal]=useState(0);
+  const[blacklist,setBlacklist]=useState([]);
+  const[fraudConfig,setFraudConfig]=useState({block_threshold:"70"});
+  const[newBlEntry,setNewBlEntry]=useState({type:"ip",value:"",reason:""});
+  const[resubmitting,setResubmitting]=useState(null);
 
   const data=whitelistOn?filterWhitelist(rawData,whitelistIPs):rawData;
 
@@ -280,6 +287,63 @@ export default function FraudDashboard({dateRange, onDateChange}){
     }
   }
 
+  // Phase 2 fetchers
+  async function fetchBlocked(){
+    try{
+      const res=await fetch(`${API_BASE}/api/fraud/blocked?days=${days}`);
+      const json=await res.json();
+      if(json.success){setBlockedLeads(json.leads||[]);setBlockedTotal(json.total||0);}
+    }catch(e){console.error("Blocked fetch error:",e);}
+  }
+  async function fetchBlacklist(){
+    try{
+      const res=await fetch(`${API_BASE}/api/fraud/blacklist`);
+      const json=await res.json();
+      if(json.success)setBlacklist(json.entries||[]);
+    }catch(e){console.error("Blacklist fetch error:",e);}
+  }
+  async function fetchConfig(){
+    try{
+      const res=await fetch(`${API_BASE}/api/fraud/config`);
+      const json=await res.json();
+      if(json.success)setFraudConfig(json.config||{});
+    }catch(e){console.error("Config fetch error:",e);}
+  }
+  async function resubmitLead(id){
+    setResubmitting(id);
+    try{
+      const res=await fetch(`${API_BASE}/api/fraud/resubmit/${id}`,{method:"POST"});
+      const json=await res.json();
+      if(json.success){
+        setBlockedLeads(prev=>prev.map(l=>l.id===id?{...l,status:json.status,_resubmitted:true}:l));
+      }else{alert(`Resubmit failed: ${json.error}`);}
+    }catch(e){alert(`Resubmit error: ${e.message}`);}
+    finally{setResubmitting(null);}
+  }
+  async function addToBlacklist(){
+    if(!newBlEntry.value.trim())return;
+    try{
+      const res=await fetch(`${API_BASE}/api/fraud/blacklist`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(newBlEntry)});
+      const json=await res.json();
+      if(json.success){fetchBlacklist();setNewBlEntry({type:"ip",value:"",reason:""});}
+    }catch(e){alert(`Error: ${e.message}`);}
+  }
+  async function removeFromBlacklist(id){
+    try{
+      await fetch(`${API_BASE}/api/fraud/blacklist/${id}`,{method:"DELETE"});
+      fetchBlacklist();
+    }catch(e){alert(`Error: ${e.message}`);}
+  }
+  async function updateThreshold(val){
+    setFraudConfig(prev=>({...prev,block_threshold:String(val)}));
+    try{
+      await fetch(`${API_BASE}/api/fraud/config`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:"block_threshold",value:String(val)})});
+    }catch(e){console.error("Config save error:",e);}
+  }
+
+  useEffect(()=>{fetchBlocked();fetchBlacklist();fetchConfig();},[]);
+  useEffect(()=>{fetchBlocked();},[days]);
+
   const risk=calcRisk(data);
   const stats=data?.stats||{};
   const totalLeads=parseInt(stats.total_leads)||0;
@@ -307,7 +371,7 @@ export default function FraudDashboard({dateRange, onDateChange}){
           <span style={{fontSize:20}}>🛡️</span> Fraud Detection
         </h2>
         <p style={{fontSize:12,color:C.textGhost,margin:"4px 0 0"}}>
-          Phase 1 — Pattern analysis on existing lead data
+          Phase 2 — Real-time fraud scoring &amp; blocking
           {lastRefresh&&<span> · Last refresh: {lastRefresh.toLocaleTimeString()}</span>}
         </p>
       </div>
@@ -353,6 +417,7 @@ export default function FraudDashboard({dateRange, onDateChange}){
           <StatCard label="Rejection Rate" value={`${rejRate}%`} icon="❌" color={parseFloat(rejRate)>50?C.danger:parseFloat(rejRate)>25?C.accent:C.text} subtitle={`${rejLeads} rejected`}/>
           <StatCard label="IP Clusters" value={data.ipClusters?.length||0} icon="🔗" color={(data.ipClusters?.length||0)>5?C.danger:C.text} subtitle="2+ leads per IP"/>
           <StatCard label="Dup Contacts" value={dupE+dupP} icon="👥" color={(dupE+dupP)>10?C.accent:C.text} subtitle={`${dupE} email · ${dupP} phone`}/>
+          <StatCard label="Blocked" value={blockedTotal} icon="⛔" color={blockedTotal>0?C.danger:C.success} subtitle={blockedTotal>0?`Threshold: ${fraudConfig.block_threshold||70}`:"None blocked"}/>
         </div>
       </div>
 
@@ -425,6 +490,87 @@ export default function FraudDashboard({dateRange, onDateChange}){
         <TH columns={[{l:"Lead",w:"60px"},{l:"Applicant",w:"1fr"},{l:"IP Address",w:"1fr"},{l:"Severity",w:"80px",a:"center"}]}/>
         {data.nonStandardIps.map((l,i)=><MultiIPRow key={i} lead={l}/>)}
       </Section>}
+
+      {/* ════ PHASE 2: MANAGEMENT SECTIONS ════ */}
+
+      {/* 9. Blocked Leads Queue */}
+      <Section title="⛔ Blocked Leads" subtitle="Leads blocked by fraud scoring — review & resubmit false positives" count={blockedTotal} severity={blockedTotal>0?"critical":"info"} defaultOpen={blockedTotal>0}>
+        {blockedLeads.length>0?<>
+          <div style={{padding:"8px 16px",fontSize:11,color:C.textDim,borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between"}}>
+            <span>Showing {blockedLeads.length} of {blockedTotal} blocked leads</span>
+            <span>Threshold: {fraudConfig.block_threshold||70}/100</span>
+          </div>
+          <TH columns={[{l:"Lead",w:"60px"},{l:"Applicant",w:"1fr"},{l:"Score",w:"70px",a:"center"},{l:"Signals",w:"1fr"},{l:"When",w:"100px"},{l:"Action",w:"100px",a:"center"}]}/>
+          {blockedLeads.map((l,i)=>{
+            const signals=(l.fraud_signals||[]).map(s=>s.signal).join(", ");
+            const ago=Math.round((Date.now()-new Date(l.created_at).getTime())/3600000);
+            const resubmitted=l._resubmitted||l.status!=="fraud_blocked";
+            return <div key={i} style={{display:"grid",gridTemplateColumns:"60px 1fr 70px 1fr 100px 100px",alignItems:"center",padding:"8px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12,opacity:resubmitted?0.5:1}}>
+              <div style={{fontWeight:700,color:C.accent}}>#{l.id}</div>
+              <div><span style={{color:C.text}}>{l.first_name} {l.last_name}</span><span style={{color:C.textGhost,marginLeft:6,fontSize:11}}>{l.email}</span></div>
+              <div style={{textAlign:"center",fontWeight:700,color:l.fraud_score>=80?C.danger:C.accent}}>{l.fraud_score}</div>
+              <div style={{color:C.textGhost,fontSize:10,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={signals}>{signals}</div>
+              <div style={{color:C.textDim,fontSize:11}}>{ago<24?`${ago}h ago`:ago<168?`${Math.round(ago/24)}d ago`:new Date(l.created_at).toLocaleDateString()}</div>
+              <div style={{textAlign:"center"}}>
+                {resubmitted
+                  ?<span style={{fontSize:10,color:C.success}}>✓ Sent</span>
+                  :<button onClick={()=>resubmitLead(l.id)} disabled={resubmitting===l.id} style={{padding:"4px 10px",borderRadius:5,border:`1px solid ${C.accent}`,background:C.accentDim,color:C.accent,fontSize:10,fontWeight:700,cursor:"pointer",opacity:resubmitting===l.id?0.5:1}}>
+                    {resubmitting===l.id?"Sending...":"Resubmit"}
+                  </button>}
+              </div>
+            </div>;
+          })}
+        </>:<div style={{padding:20,textAlign:"center",color:C.textGhost,fontSize:12}}>No leads blocked in this period ✓</div>}
+      </Section>
+
+      {/* 10. Blacklist Manager & Threshold */}
+      <Section title="🚫 Blacklist & Settings" subtitle="Block specific IPs, emails, phones — configure scoring threshold" count={blacklist.length} severity={blacklist.length>0?"high":"info"} defaultOpen={false}>
+        {/* Threshold slider */}
+        <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text}}>Block Threshold</div>
+            <div style={{fontSize:20,fontWeight:800,color:parseInt(fraudConfig.block_threshold)<=50?C.danger:parseInt(fraudConfig.block_threshold)<=70?C.accent:C.success}}>{fraudConfig.block_threshold||70}<span style={{fontSize:11,color:C.textDim}}>/100</span></div>
+          </div>
+          <input type="range" min="20" max="100" step="5" value={parseInt(fraudConfig.block_threshold)||70} onChange={e=>updateThreshold(e.target.value)}
+            style={{width:"100%",accentColor:C.accent,cursor:"pointer"}}/>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.textGhost,marginTop:4}}>
+            <span>← More aggressive (blocks more)</span>
+            <span>Less aggressive (blocks fewer) →</span>
+          </div>
+          <div style={{fontSize:10,color:C.textDim,marginTop:8}}>
+            Leads scoring ≥ {fraudConfig.block_threshold||70} will be automatically blocked from reaching FiestaCredito. Lower = stricter, higher = more lenient.
+          </div>
+        </div>
+
+        {/* Add to blacklist */}
+        <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10}}>Add to Blacklist</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <select value={newBlEntry.type} onChange={e=>setNewBlEntry({...newBlEntry,type:e.target.value})} style={{padding:"6px 10px",borderRadius:6,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:12}}>
+              <option value="ip">IP Address</option>
+              <option value="email">Email</option>
+              <option value="phone">Phone</option>
+            </select>
+            <input value={newBlEntry.value} onChange={e=>setNewBlEntry({...newBlEntry,value:e.target.value})} placeholder={newBlEntry.type==="ip"?"192.168.1.1":newBlEntry.type==="email"?"fraud@example.com":"+34600000000"}
+              style={{flex:1,minWidth:180,padding:"6px 10px",borderRadius:6,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:12,fontFamily:"monospace"}}/>
+            <input value={newBlEntry.reason} onChange={e=>setNewBlEntry({...newBlEntry,reason:e.target.value})} placeholder="Reason (optional)"
+              style={{flex:1,minWidth:120,padding:"6px 10px",borderRadius:6,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:12}}/>
+            <button onClick={addToBlacklist} style={{padding:"6px 14px",borderRadius:6,border:`1px solid ${C.danger}`,background:C.dangerDim,color:C.danger,fontSize:12,fontWeight:700,cursor:"pointer"}}>Block</button>
+          </div>
+        </div>
+
+        {/* Blacklist entries */}
+        {blacklist.length>0?<>
+          <TH columns={[{l:"Type",w:"80px"},{l:"Value",w:"1fr"},{l:"Reason",w:"1fr"},{l:"Added",w:"100px"},{l:"",w:"60px",a:"center"}]}/>
+          {blacklist.map((bl,i)=><div key={i} style={{display:"grid",gridTemplateColumns:"80px 1fr 1fr 100px 60px",alignItems:"center",padding:"8px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+            <div><span style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:700,background:bl.type==="ip"?C.dangerDim:bl.type==="email"?C.accentDim:C.warnDim,color:bl.type==="ip"?C.danger:bl.type==="email"?C.accent:C.warn}}>{bl.type.toUpperCase()}</span></div>
+            <div style={{fontFamily:"monospace",color:C.text}}>{bl.value}</div>
+            <div style={{color:C.textGhost}}>{bl.reason||"—"}</div>
+            <div style={{color:C.textDim,fontSize:11}}>{new Date(bl.created_at).toLocaleDateString()}</div>
+            <div style={{textAlign:"center"}}><button onClick={()=>removeFromBlacklist(bl.id)} style={{padding:"2px 8px",borderRadius:4,border:`1px solid ${C.border}`,background:"transparent",color:C.danger,fontSize:11,cursor:"pointer"}} title="Remove">×</button></div>
+          </div>)}
+        </>:<div style={{padding:16,textAlign:"center",color:C.textGhost,fontSize:12}}>No entries in blacklist</div>}
+      </Section>
 
       {/* 9. Rejection Reasons (always last) */}
       <Section title="Rejection Reasons" subtitle="Why FiestaCredito rejected leads" count={data.rejectionReasons?.length||0} severity="info" defaultOpen={false}>
