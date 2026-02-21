@@ -54,6 +54,34 @@ const fm = {
   short: d => d ? new Date(d + "T00:00").toLocaleDateString("en", { day: "numeric", month: "short" }) : "",
 };
 
+const PURPOSE_MAP = {
+  gasto_imprevisto: "Unexpected Expense", consolidacion_deudas: "Debt Consolidation",
+  reforma_hogar: "Home Renovation", vehiculo: "Vehicle", vacaciones: "Holidays",
+  salud: "Health", educacion: "Education", negocio: "Business", boda: "Wedding",
+  negocio_propio: "Own Business", pago_servicios: "Service Payment",
+  material_electronico: "Electronics", gasto_medico: "Medical Expense",
+  reparaciones: "Repairs", otro: "Other", other: "Other",
+  alimentacion: "Food & Groceries", transporte: "Transport", vivienda: "Housing",
+  mudanza: "Moving", impuestos: "Taxes", deudas: "Debts", inversion: "Investment",
+  formacion: "Training", ocio: "Leisure", mascotas: "Pets", viaje: "Travel",
+  compras: "Shopping", hogar: "Home", familia: "Family", emergencia: "Emergency",
+  refinanciacion: "Refinancing", no_especificado: "Not Specified",
+  creacion_mejora_historial_crediticio: "Credit History Building",
+  creacion_mejora_del_historial_crediticio: "Credit History Building",
+  mejora_historial: "Credit History Building",
+};
+const fmPurpose = (key) => {
+  if (!key) return "—";
+  const en = PURPOSE_MAP[key];
+  const nice = key.replace(/[_-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  return en ? `${nice} / ${en}` : nice;
+};
+const fmMonths = (days) => {
+  if (!days) return "—";
+  const m = Math.round(days / 30);
+  return m === 1 ? "1 month" : `${m} months`;
+};
+
 async function apiFetch(path, opts = {}) {
   const res = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json", ...opts.headers }, ...opts });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || e.message || `HTTP ${res.status}`); }
@@ -335,6 +363,11 @@ function OverviewPage({ dateRange }) {
         <Stat label="This Week" value={fm.num(s.leadsThisWeek)} sub={`${fm.num(s.leadsThisMonth)} this month`} color={C.violet} icon="📈" tip="Leads captured this calendar week and month" />
         <Stat label="Avg Response" value={s.avgResponseTimeMs ? fm.ms(s.avgResponseTimeMs) : "—"} sub={s.avgResponseTimeMs ? fm.msRaw(s.avgResponseTimeMs) : "no data"} color={C.cyan} icon="⚡" tip="Average time for the lender API to respond after we send a lead" />
       </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+        <Stat label="Avg Loan Amount" value={s.avgLoanAmount ? fm.eur(s.avgLoanAmount) : "—"} color={C.sky} icon="💶" tip="Average loan amount requested across all leads in this period" />
+        <Stat label="Avg Loan Term" value={fmMonths(s.avgLoanPeriod)} color={C.violet} icon="📅" tip="Average loan term requested, converted from days to months" />
+        <Stat label="Top Purpose" value={s.topPurpose ? fmPurpose(s.topPurpose.purpose) : "—"} sub={s.topPurpose ? `${s.topPurpose.count} leads` : ""} color={C.gold} icon="🎯" tip="Most common loan purpose selected by applicants in this period" />
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <Crd style={{ padding: "18px 20px" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 14 }}>Revenue · 30 Days</div>
@@ -399,6 +432,7 @@ function LeadsPage({ dateRange }) {
   const [lastRefresh, setLastRefresh] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [collapsed, setCollapsed] = useState({ identity: true, system: true });
+  const [leadStats, setLeadStats] = useState(null);
   const intervalRef = useRef(null);
 
   const load = useCallback((silent = false) => {
@@ -409,7 +443,11 @@ function LeadsPage({ dateRange }) {
     if (filters.source) p.set("source", filters.source);
     if (dateRange.from) p.set("from", dateRange.from.toISOString());
     if (dateRange.to) p.set("to", dateRange.to.toISOString());
-    apiFetch(`/leads?${p}`).then(d => { setLeads(d.leads || []); setPg(d.pagination || { page: 1, totalPages: 1, totalCount: 0 }); setLastRefresh(new Date()); }).catch(() => setLeads([])).finally(() => { setLoading(false); setRefreshing(false); });
+    const dp = dateParams(dateRange);
+    Promise.all([
+      apiFetch(`/leads?${p}`),
+      apiFetch(`/analytics/summary${dp ? `?${dp}` : ""}`).catch(() => null),
+    ]).then(([d, s]) => { setLeads(d.leads || []); setPg(d.pagination || { page: 1, totalPages: 1, totalCount: 0 }); setLeadStats(s?.stats || null); setLastRefresh(new Date()); }).catch(() => setLeads([])).finally(() => { setLoading(false); setRefreshing(false); });
   }, [filters, dateRange]);
 
   useEffect(() => { load(); }, [load]);
@@ -445,6 +483,25 @@ function LeadsPage({ dateRange }) {
           <span>{fm.num(pg.totalCount)} leads</span>
         </div>
       </div>
+      {leadStats && (
+        <div style={{ display: "flex", gap: 20, padding: "10px 16px", background: C.panel, borderRadius: 10, border: `1px solid ${C.border}`, alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em" }}>Avg Amount</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: C.sky }}>{leadStats.avgLoanAmount ? fm.eur(leadStats.avgLoanAmount) : "—"}</span>
+          </div>
+          <div style={{ width: 1, height: 20, background: C.border }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em" }}>Avg Term</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: C.violet }}>{fmMonths(leadStats.avgLoanPeriod)}</span>
+          </div>
+          <div style={{ width: 1, height: 20, background: C.border }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".06em" }}>Top Purpose</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: C.gold }}>{leadStats.topPurpose ? fmPurpose(leadStats.topPurpose.purpose) : "—"}</span>
+            {leadStats.topPurpose && <span style={{ fontSize: 10, color: C.textDim }}>({leadStats.topPurpose.count})</span>}
+          </div>
+        </div>
+      )}
       <Crd>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
@@ -477,28 +534,12 @@ function LeadsPage({ dateRange }) {
       <Modal open={!!selected} onClose={() => { setSelected(null); setDetail(null); setCollapsed({ identity: true, system: true }); }} title="" w={720}>
         {detailLoading ? <div style={{ textAlign: "center", padding: 44 }}><Spin sz={26} /></div> : detail?.lead ? (() => {
           const L = detail.lead;
-          const purposeMap = {
-            gasto_imprevisto: "Unexpected Expense", consolidacion_deudas: "Debt Consolidation",
-            reforma_hogar: "Home Renovation", vehiculo: "Vehicle", vacaciones: "Holidays",
-            salud: "Health", educacion: "Education", negocio: "Business", boda: "Wedding",
-            negocio_propio: "Own Business", pago_servicios: "Service Payment",
-            material_electronico: "Electronics", gasto_medico: "Medical Expense",
-            reparaciones: "Repairs", otro: "Other", other: "Other",
-            alimentacion: "Food & Groceries", transporte: "Transport", vivienda: "Housing",
-            mudanza: "Moving", impuestos: "Taxes", deudas: "Debts", inversion: "Investment",
-            formacion: "Training", ocio: "Leisure", mascotas: "Pets", viaje: "Travel",
-            compras: "Shopping", hogar: "Home", familia: "Family", emergencia: "Emergency",
-            refinanciacion: "Refinancing", no_especificado: "Not Specified",
-            creacion_mejora_historial_crediticio: "Credit History Building",
-            creacion_mejora_del_historial_crediticio: "Credit History Building",
-            mejora_historial: "Credit History Building",
-          };
           // Humanize: "not_married" → "Not Married", "living_with_parents" → "Living With Parents"
           const humanize = (s) => {
             if (!s || typeof s !== "string") return s;
             return s.replace(/[_-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
           };
-          const purposeEn = L.loan_purpose ? purposeMap[L.loan_purpose] || null : null;
+          const purposeEn = L.loan_purpose ? PURPOSE_MAP[L.loan_purpose] || null : null;
           const purposeDisplay = L.loan_purpose ? (purposeEn ? `${humanize(L.loan_purpose)} / ${purposeEn}` : humanize(L.loan_purpose)) : null;
 
           const calcAge = (dob) => {
