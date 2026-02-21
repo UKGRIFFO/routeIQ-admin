@@ -171,12 +171,11 @@ function MultiIPRow({lead}){
 function SpeedRow({item}){
   const secs=parseFloat(item.completion_seconds)||0;
   const sev=secs<30?"critical":secs<60?"high":"medium";
-  const steps=parseInt(item.steps_completed)||0;
-  return <div style={{display:"grid",gridTemplateColumns:"120px 100px 80px 80px 100px",alignItems:"center",padding:"8px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12}}>
-    <div style={{fontFamily:"monospace",color:C.textDim,fontSize:11}}>{item.session_id?.substring(0,16)}…</div>
-    <div style={{fontFamily:"monospace",fontWeight:700,color:sev==="critical"?C.danger:sev==="high"?C.accent:C.warn}}>{secs<60?`${Math.round(secs)}s`:`${(secs/60).toFixed(1)}m`}</div>
-    <div style={{textAlign:"center",color:C.textDim}}>{steps} steps</div>
-    <div style={{textAlign:"center",color:C.textDim}}>→ step {item.max_step}</div>
+  const name=[item.first_name,item.last_name].filter(Boolean).join(" ")||"—";
+  return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 100px 100px",alignItems:"center",padding:"8px 16px",borderBottom:`1px solid ${C.border}`,fontSize:12}}>
+    <div style={{color:C.text,fontWeight:600}}>{name}</div>
+    <div style={{color:C.textDim}}>{item.email||"—"}</div>
+    <div style={{fontFamily:"monospace",fontWeight:700,color:sev==="critical"?C.danger:sev==="high"?C.accent:C.warn,textAlign:"center"}}>{secs<60?`${Math.round(secs)}s`:`${(secs/60).toFixed(1)}m`}</div>
     <div style={{textAlign:"center"}}><SeverityBadge level={sev}/></div>
   </div>;
 }
@@ -368,10 +367,11 @@ export default function FraudDashboard({dateRange, onDateChange}){
       <Section title="Speed Analysis" subtitle="Suspiciously fast form completions" count={fastCount} severity={fastCount>0?(parseInt(speedDist.critical_count)||0)>0?"critical":"high":"info"}>
         <div style={{padding:"16px 20px"}}>
           <SpeedDistChart dist={speedDist}/>
-          <div style={{fontSize:10,color:C.textGhost,marginTop:8,textAlign:"center"}}>Sessions completing 3+ form steps — Red: under 30s (bot) · Orange: 30-60s · Amber: 1-2min · Green: normal</div>
+          <div style={{fontSize:10,color:C.textGhost,marginTop:8,textAlign:"center"}}>Red: under 30s (bot) · Orange: 30-60s · Amber: 1-2min · Green: normal (2min+)</div>
         </div>
         {speedAnalysis.length>0&&<>
-          <TH columns={[{l:"Session",w:"120px"},{l:"Time",w:"100px"},{l:"Steps",w:"80px",a:"center"},{l:"Reached",w:"80px",a:"center"},{l:"Severity",w:"100px",a:"center"}]}/>
+          <div style={{padding:"6px 16px",fontSize:11,color:C.textDim,borderBottom:`1px solid ${C.border}`}}>Top {speedAnalysis.length} fastest of {fastCount} suspicious sessions</div>
+          <TH columns={[{l:"Name",w:"1fr"},{l:"Email",w:"1fr"},{l:"Time",w:"100px",a:"center"},{l:"Severity",w:"100px",a:"center"}]}/>
           {speedAnalysis.map((s,i)=><SpeedRow key={i} item={s}/>)}
         </>}
         {speedAnalysis.length===0&&<div style={{padding:20,textAlign:"center",color:C.textGhost,fontSize:12}}>No suspiciously fast completions detected ✓</div>}
