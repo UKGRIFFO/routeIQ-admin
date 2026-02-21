@@ -1181,7 +1181,7 @@ export default function DashboardPage() {
           {page === "funnel" && <FunnelPage dateRange={dateRange} />}
           {page === "lenders" && <LendersPage />}
           {page === "analytics" && <AnalyticsPage dateRange={dateRange} />}
-          {page === "fraud" && <FraudDashboard dateRange={dateRange} />}
+          {page === "fraud" && <FraudDashboard dateRange={dateRange} onDateChange={setDateRange} />}
           {page === "settings" && <SettingsPage />}
         </div>
       </main>
