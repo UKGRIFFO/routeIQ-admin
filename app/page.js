@@ -858,7 +858,7 @@ function AnalyticsPage({ dateRange }) {
   const dp = dateParams(dateRange);
   useEffect(() => { setLoading(true); apiFetch(`/analytics/daily?days=90${dp ? `&${dp}` : ""}`).then(d => setDaily(d.analytics || [])).catch(() => setDaily([])).finally(() => setLoading(false)); }, [dp]);
 
-  const t = daily.reduce((a, d) => ({ leads: a.leads + (d.total_leads || 0), sold: a.sold + (d.sold_leads || 0), rej: a.rej + (d.rejected_leads || 0), dupes: a.dupes + (d.duplicate_leads || 0), rev: a.rev + (Number(d.total_revenue) || 0) }), { leads: 0, sold: 0, rej: 0, dupes: 0, rev: 0 });
+  const t = daily.reduce((a, d) => ({ leads: a.leads + (parseInt(d.total_leads) || 0), sold: a.sold + (parseInt(d.sold_leads) || 0), rej: a.rej + (parseInt(d.rejected_leads) || 0), dupes: a.dupes + (parseInt(d.duplicate_leads) || 0), rev: a.rev + (Number(d.total_revenue) || 0) }), { leads: 0, sold: 0, rej: 0, dupes: 0, rev: 0 });
   const conv = t.leads > 0 ? t.sold / t.leads : 0;
 
   return (
