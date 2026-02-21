@@ -6,15 +6,16 @@ const API_BASE = "https://loan-broker-backend-production.up.railway.app";
 
 // ── Color system matching RouteIQ ──
 const C = {
-  bg: "#0a0a0f",
-  surface: "#12121a",
-  surfaceHover: "#1a1a25",
-  border: "#1e1e2e",
-  borderLight: "#2a2a3d",
-  text: "#e4e4ed",
-  textDim: "#8888a0",
-  textGhost: "#55556a",
-  accent: "#f97316",       // orange for warnings
+  bg: "#06090D",
+  surface: "#111821",
+  surfaceHover: "#161E28",
+  border: "#1A2332",
+  borderLight: "#243044",
+  text: "#E2E8F0",
+  textDim: "#475569",
+  textGhost: "#334155",
+  textSoft: "#94A3B8",
+  accent: "#f97316",
   accentDim: "rgba(249,115,22,0.12)",
   danger: "#ef4444",
   dangerDim: "rgba(239,68,68,0.12)",
@@ -55,7 +56,7 @@ function SeverityBadge({ level }) {
 function StatCard({ label, value, subtitle, color = C.text, icon }) {
   return (
     <div style={{
-      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
       padding: "18px 20px", flex: 1, minWidth: 160,
     }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: C.textGhost, textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
@@ -101,7 +102,7 @@ function HourlyChart({ data }) {
 }
 
 // ── IP Cluster row ──
-function IPClusterRow({ cluster, onFlag }) {
+function IPClusterRow({ cluster }) {
   const [expanded, setExpanded] = useState(false);
   const count = parseInt(cluster.lead_count);
   const severity = count >= 5 ? "critical" : count >= 3 ? "high" : "medium";
@@ -228,7 +229,7 @@ function Section({ title, subtitle, count, children, severity, defaultOpen = tru
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{
-      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
       overflow: "hidden", marginBottom: 16,
     }}>
       <div
@@ -277,7 +278,7 @@ function TableHeader({ columns }) {
 function calculateRiskScore(data) {
   if (!data) return { score: 0, level: "low" };
   let score = 0;
-  
+
   const ipClusters = data.ipClusters?.length || 0;
   const rapidSubs = data.rapidSubmissions?.length || 0;
   const bigClusters = (data.ipClusters || []).filter(c => parseInt(c.lead_count) >= 5).length;
@@ -298,7 +299,7 @@ function RiskGauge({ score, level }) {
   const color = colorMap[level];
   return (
     <div style={{
-      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+      background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
       padding: "18px 24px", display: "flex", alignItems: "center", gap: 20, flex: "0 0 260px",
     }}>
       <div style={{ position: "relative", width: 72, height: 72 }}>
@@ -326,7 +327,7 @@ function RiskGauge({ score, level }) {
 // ── Rejection breakdown ──
 function RejectionBreakdown({ reasons }) {
   if (!reasons || reasons.length === 0) return <div style={{ padding: 16, color: C.textGhost, fontSize: 12, textAlign: "center" }}>No rejections in this period</div>;
-  
+
   return (
     <div style={{ padding: "8px 0" }}>
       {reasons.map((r, i) => {
@@ -353,18 +354,28 @@ function RejectionBreakdown({ reasons }) {
 //  MAIN COMPONENT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-export default function FraudDashboard() {
+export default function FraudDashboard({ dateRange }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [days, setDays] = useState(30);
   const [lastRefresh, setLastRefresh] = useState(null);
+
+  // Build query params from the main dashboard's dateRange prop
+  const buildParams = useCallback(() => {
+    const p = new URLSearchParams();
+    if (dateRange?.from) p.set("from", dateRange.from.toISOString());
+    if (dateRange?.to) p.set("to", dateRange.to.toISOString());
+    // Fallback: if "All Time" or no range, default to 90 days
+    if (!dateRange?.from && !dateRange?.to) p.set("days", "90");
+    return p.toString();
+  }, [dateRange]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/fraud/summary?days=${days}`);
+      const params = buildParams();
+      const res = await fetch(`${API_BASE}/api/fraud/summary?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (!json.success) throw new Error(json.error || "Unknown error");
@@ -375,7 +386,7 @@ export default function FraudDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [days]);
+  }, [buildParams]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -386,39 +397,16 @@ export default function FraudDashboard() {
   const rejRate = totalLeads > 0 ? ((rejectedLeads / totalLeads) * 100).toFixed(1) : "0.0";
   const dupEmails = parseInt(stats.duplicate_emails) || 0;
   const dupPhones = parseInt(stats.duplicate_phones) || 0;
+  const rangeLabel = dateRange?.label || "All Time";
 
   return (
-    <div style={{
-      fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
-      background: C.bg, color: C.text, minHeight: "100vh",
-      padding: "24px 28px",
-    }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, margin: 0, display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 20 }}>🛡️</span>
-            Fraud Detection
-          </h1>
-          <p style={{ fontSize: 12, color: C.textGhost, margin: "4px 0 0" }}>
-            Phase 1 — Pattern analysis on existing lead data
-            {lastRefresh && <span> · Last refresh: {lastRefresh.toLocaleTimeString()}</span>}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[7, 14, 30, 90].map(d => (
-            <button key={d} onClick={() => setDays(d)} style={{
-              padding: "6px 14px", borderRadius: 6, border: `1px solid ${days === d ? C.accent : C.border}`,
-              background: days === d ? C.accentDim : "transparent",
-              color: days === d ? C.accent : C.textDim,
-              fontSize: 12, fontWeight: 600, cursor: "pointer",
-              transition: "all 0.15s",
-            }}>{d}d</button>
-          ))}
-          <button onClick={fetchData} style={{
-            padding: "6px 14px", borderRadius: 6, border: `1px solid ${C.border}`,
-            background: "transparent", color: C.textDim, fontSize: 12, cursor: "pointer",
-          }}>↻ Refresh</button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* Subheader */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: 12, color: C.textGhost }}>
+          Phase 1 — Pattern analysis on existing lead data
+          {lastRefresh && <span> · Last refresh: {lastRefresh.toLocaleTimeString()}</span>}
         </div>
       </div>
 
@@ -426,7 +414,7 @@ export default function FraudDashboard() {
         <div style={{
           padding: "12px 16px", borderRadius: 8, background: C.dangerDim,
           border: `1px solid rgba(239,68,68,0.3)`, color: C.danger,
-          fontSize: 13, marginBottom: 16,
+          fontSize: 13,
         }}>
           ⚠ Error loading fraud data: {error}
           <br /><span style={{ fontSize: 11, color: C.textDim }}>Make sure the fraud API endpoints are deployed to your backend.</span>
@@ -441,10 +429,10 @@ export default function FraudDashboard() {
       ) : data && (
         <>
           {/* Top row: Risk gauge + stat cards */}
-          <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <RiskGauge score={risk.score} level={risk.level} />
             <div style={{ display: "flex", gap: 12, flex: 1, flexWrap: "wrap" }}>
-              <StatCard label="Total Leads" value={totalLeads} icon="📊" subtitle={`Last ${days} days`} />
+              <StatCard label="Total Leads" value={totalLeads} icon="📊" subtitle={rangeLabel} />
               <StatCard label="Rejection Rate" value={`${rejRate}%`} icon="❌"
                 color={parseFloat(rejRate) > 50 ? C.danger : parseFloat(rejRate) > 25 ? C.accent : C.text}
                 subtitle={`${rejectedLeads} rejected`}
