@@ -529,16 +529,18 @@ export default function FraudDashboard({dateRange, onDateChange}){
         <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.border}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <div style={{fontSize:12,fontWeight:700,color:C.text}}>Block Threshold</div>
-            <div style={{fontSize:20,fontWeight:800,color:parseInt(fraudConfig.block_threshold)<=50?C.danger:parseInt(fraudConfig.block_threshold)<=70?C.accent:C.success}}>{fraudConfig.block_threshold||70}<span style={{fontSize:11,color:C.textDim}}>/100</span></div>
+            <div style={{fontSize:20,fontWeight:800,color:parseInt(fraudConfig.block_threshold)<=40?C.danger:parseInt(fraudConfig.block_threshold)<=60?C.accent:parseInt(fraudConfig.block_threshold)<=80?C.warn:C.success}}>{fraudConfig.block_threshold||70}<span style={{fontSize:11,color:C.textDim}}>/100</span></div>
           </div>
+          <style>{`.fraud-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid #111;}.fraud-slider::-webkit-slider-runnable-track{height:6px;border-radius:3px;}`}</style>
           <input type="range" min="20" max="100" step="5" value={parseInt(fraudConfig.block_threshold)||70} onChange={e=>updateThreshold(e.target.value)}
-            style={{width:"100%",accentColor:C.accent,cursor:"pointer"}}/>
+            className="fraud-slider"
+            style={{width:"100%",cursor:"pointer",accentColor:parseInt(fraudConfig.block_threshold)<=40?C.danger:parseInt(fraudConfig.block_threshold)<=60?C.accent:parseInt(fraudConfig.block_threshold)<=80?C.warn:C.success}}/>
           <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.textGhost,marginTop:4}}>
-            <span>← More aggressive (blocks more)</span>
-            <span>Less aggressive (blocks fewer) →</span>
+            <span style={{color:C.danger}}>← Strict (blocks more)</span>
+            <span style={{color:C.success}}>Lenient (blocks fewer) →</span>
           </div>
           <div style={{fontSize:10,color:C.textDim,marginTop:8}}>
-            Leads scoring ≥ {fraudConfig.block_threshold||70} will be automatically blocked from reaching FiestaCredito. Lower = stricter, higher = more lenient.
+            Leads scoring ≥ {fraudConfig.block_threshold||70} will be automatically blocked. Lower = more leads blocked, higher = only obvious fraud caught.
           </div>
         </div>
 
